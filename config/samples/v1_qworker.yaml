@@ -17,11 +17,10 @@ spec:
     minReplicas: 2
     maxReplicas: 20
     brokerConfig:
-      redisConfig:
-        host: "10.96.179.2"
-        port: 6379
-        password: "Aa123456"
-        db: "0"
+      host: "10.96.179.2"
+      port: 6379
+      password: "Aa123456"
+      db: "0"
     scalingFactor: 1
 status:
   currentReplicas: 0

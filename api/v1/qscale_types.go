@@ -27,6 +27,7 @@ import (
 
 // QScaleSpec defines the desired state of QScale.
 type QWorkerSpec struct {
+	ObjectMeta  metav1.ObjectMeta  `json:"ObjectMeta"`
 	PodSpec     corev1.PodSpec     `json:"podSpec"`
 	ScaleConfig QWorkerScaleConfig `json:"scaleConfig,omitempty"`
 }
@@ -39,22 +40,18 @@ type QWorkerStatus struct {
 
 type QWorkerScaleConfig struct {
 	Broker        string       `json:"broker"`
+	BrokerConfig  BrokerConfig `json:"brokerConfig"`
 	Queue         string       `json:"queue"`
 	MinReplicas   int64        `json:"minReplicas"`
 	MaxReplicas   int64        `json:"maxReplicas"`
-	BrokerConfig  BrokerConfig `json:"brokerConfig"`
 	ScalingFactor int64        `json:"scalingFactor"`
 }
 
 type BrokerConfig struct {
-	RedisConfig redisConfig `json:"redisConfig"`
-}
-
-type redisConfig struct {
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
-	Password string `json:"password"`
-	Db       string `json:"db"`
+	Password string `json:"password,omitempty"`
+	Db       string `json:"db,omitempty"`
 }
 
 // +kubebuilder:object:root=true

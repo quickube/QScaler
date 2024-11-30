@@ -24,7 +24,6 @@ import (
 	"github.com/google/uuid"
 	v1 "github.com/quickube/QScale/api/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"math"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -89,22 +88,10 @@ func (r *QScaleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 func (r *QScaleReconciler) StartWorker(scaler *v1.QWorker, ctx *context.Context) error {
 	podId := uuid.New().String()
+	scaler.Spec.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", scaler.Spec.ObjectMeta.Name, scaler.Spec.ScaleConfig.Queue, podId)
 	workerPod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("qscale-worker-%s-%s", scaler.Spec.ScaleConfig.Queue, podId),
-			Namespace: scaler.Spec.NameSpace,
-		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name:    "work-container",
-					Image:   scaler.Spec.Image,
-					Command: scaler.Spec.Command,
-					Args:    scaler.Spec.Args,
-					Env:     scaler.Spec.Env,
-				},
-			},
-		},
+		ObjectMeta: scaler.Spec.ObjectMeta,
+		Spec:       scaler.Spec.PodSpec,
 	}
 	if err := r.Create(*ctx, workerPod); err != nil {
 		log.Log.Error(err, "unable to start worker pod")
@@ -125,8 +112,8 @@ func (r *QScaleReconciler) RemoveWorker(scaler *v1.QWorker, redisClient *redis.C
 
 func GetRedisClient(scaler *v1.QWorker, ctx *context.Context) *redis.Client {
 	Rclient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", scaler.Spec.ScaleConfig.BrokerConfig.RedisConfig.Host, scaler.Spec.ScaleConfig.BrokerConfig.RedisConfig.Port),
-		Password: scaler.Spec.ScaleConfig.BrokerConfig.RedisConfig.Password,
+		Addr:     fmt.Sprintf("%s:%d", scaler.Spec.ScaleConfig.BrokerConfig.Host, scaler.Spec.ScaleConfig.BrokerConfig.Port),
+		Password: scaler.Spec.ScaleConfig.BrokerConfig.Password,
 	})
 	redisStatus := Rclient.Ping(*ctx)
 	log.Log.Info(fmt.Sprintf("Redis Status: %v", redisStatus))
