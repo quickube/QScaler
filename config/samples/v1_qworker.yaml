@@ -1,0 +1,28 @@
+apiVersion: github.com/v1
+kind: QWorker
+metadata:
+  labels:
+    app.kubernetes.io/name: qworker
+    app.kubernetes.io/managed-by: kustomize
+  name: qscale-sample
+spec:
+  namespace: "default"
+  image: "localhost:5001/worker"
+  command: []
+  args: []
+  env: []
+  scaleConfig:
+    broker: "redis"
+    queue: "q1"
+    minReplicas: 2
+    maxReplicas: 20
+    brokerConfig:
+      redisConfig:
+        host: "10.96.179.2"
+        port: 6379
+        password: "Aa123456"
+        db: "0"
+    scalingFactor: 1
+status:
+  currentReplicas: 0
+  desiredReplicas: 0
