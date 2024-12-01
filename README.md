@@ -1,23 +1,23 @@
 # QScaler
 
-This project aim to provide kubernetes native worker controller based on queue system. 
+QScaler is an open-source, Kubernetes-native worker controller that scales pods based on queue rate and length. It provides an intelligent solution for managing queue-based workers, addressing the limitations of existing systems like KEDA, and ensures efficient processing without disrupting in-progress tasks.
 
+## Overview
+In modern microservices architectures, handling workloads through queues is common. However, scaling workers that process these queues efficiently remains a challenge. Traditional Horizontal Pod Autoscalers (HPAs) like KEDA excel at scaling up but fall short in scaling down gracefully, often terminating pods abruptly and risking the loss of in-progress work.
 
-## Problem statement 
+QScaler solves this problem by introducing a smarter scaling mechanism that is aware of both the queue state and the worker's processing status
 
-Today queue HPA systems (KEDA) not good enough on management of queue based workers due to the following reasons:
-1. KEDA doing a great work in scaling up horizontal, but scaling down is naive and suites stateless application. Scaling down killing a worker happens randomly which can stop in progress worker. This can lead to vicious circle of re-queuing the work and trigger scaling up.  
-2. The developers of such workers in K8s need to create stateless workers, because of risk of termination. This is not an easy task.
- 
+## Problem Statement
+Current queue-based HPA systems are not optimal for managing queue-based workers due to:
 
-## Concept 
+1. Inefficient Scaling Down: Systems like KEDA scale down pods naively by terminating them randomly. This abrupt termination can stop workers that are processing tasks, leading to those tasks being re-queued and causing unnecessary scaling up—a vicious cycle that wastes resources.
+2. Complex Stateless Worker Design: Developers are forced to design stateless workers to mitigate the risk of abrupt termination. Creating truly stateless applications is challenging and not always feasible, adding complexity to the development process.
 
-### HPA
-The controller will scale up and down pods based on the CRD named Worker. 
-It will trigger scale up using rate or queue length, and scale down workers with a SIGKILL_QUEUE. The worker should subscribe the queue, and terminate itself when such message appears before any new job taken.
+## How It Works 
 
+### Horizontal Pod Autoscaling (HPA)
+* **Scaling Up**: QScaler monitors the queue's rate and length. When increased workload is detected, it scales up worker pods accordingly.
+* **Scaling Down**: To prevent disrupting active tasks, QScaler sends a SIGKILL_QUEUE message via the queue system. Workers receive this message and, after completing current tasks, terminate themselves before taking on new ones.
 
-### VPA
-
-The controller will take the initial resources requirements and adjust to MAX resource used in previous runs, or add more resources if any OOM event happens. 
-
+### Vertical Pod Autoscaling (VPA)
+* **Resource Adjustment**: QScaler observes resource utilization and adjusts pod resource requests and limits. It ensures pods have sufficient resources based on historical maximum usage and reacts to OOM events by allocating more resources.
