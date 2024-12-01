@@ -1,5 +1,0 @@
-## Append samples of your project ##
-resources:
-- v1alpha1_qscaler.yaml
-- v1alpha1_scalerconfig.yaml
-# +kubebuilder:scaffold:manifestskustomizesamples

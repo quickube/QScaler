@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.4
-  name: scalerconfigs.quickcube.com
+  name: scalerconfigs.quickube.com
 spec:
-  group: quickcube.com
+  group: quickube.com
   names:
     kind: ScalerConfig
     listKind: ScalerConfigList

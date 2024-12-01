@@ -1,0 +1,60 @@
+{{ if .Values.installCRDs }}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.4
+  name: scalerconfigs.quickube.com
+spec:
+  group: quickube.com
+  names:
+    kind: ScalerConfig
+    listKind: ScalerConfigList
+    plural: scalerconfigs
+    singular: scalerconfig
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        properties:
+          Spec:
+            additionalProperties:
+              type: string
+            type: object
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          status:
+            properties:
+              healthy:
+                type: boolean
+              message:
+                type: string
+            type: object
+          type:
+            type: string
+        required:
+        - Spec
+        - type
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+  {{- end }}

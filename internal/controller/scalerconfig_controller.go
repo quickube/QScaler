@@ -30,8 +30,7 @@ import (
 // ScalerConfigReconciler reconciles a ScalerConfig object
 type ScalerConfigReconciler struct {
 	client.Client
-	ScalerConfigList quickcubecomv1alpha1.ScalerConfigList
-	Scheme           *runtime.Scheme
+	Scheme *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=quickcube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
@@ -56,12 +55,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	for _, conf := range r.ScalerConfigList.Items {
-		if conf != scalerConfig {
-
-		}
-	}
-
+	log.Log.Info("ScalerConfig reconciled", "name", scalerConfig.Name)
 	return ctrl.Result{}, nil
 }
 

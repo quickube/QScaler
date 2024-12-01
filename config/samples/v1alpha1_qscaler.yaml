@@ -1,9 +1,0 @@
-apiVersion: quickcube.com/v1alpha1
-kind: QScaler
-metadata:
-  labels:
-    app.kubernetes.io/name: qscale
-    app.kubernetes.io/managed-by: kustomize
-  name: qscaler-sample
-spec:
-  # TODO(user): Add fields here

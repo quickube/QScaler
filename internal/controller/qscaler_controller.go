@@ -23,7 +23,6 @@ import (
 	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
 	v1 "github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
-	conf "github.com/quickube/QScaler/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,7 +33,6 @@ import (
 
 // QWorkerReconciler reconciles a QScaler object
 type QWorkerReconciler struct {
-	Config       *conf.GlobalConfig
 	BrokerClient brokers.Broker
 	client.Client
 	Scheme *runtime.Scheme
