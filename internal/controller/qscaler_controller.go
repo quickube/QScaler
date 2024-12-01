@@ -19,21 +19,20 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
-	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
-	v1 "github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"time"
 )
 
 // QWorkerReconciler reconciles a QScaler object
 type QWorkerReconciler struct {
-	BrokerClient brokers.Broker
 	client.Client
 	Scheme *runtime.Scheme
 }
@@ -45,12 +44,26 @@ type QWorkerReconciler struct {
 
 func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	qworker := &v1.QWorker{}
+	qworker := &v1alpha1.QWorker{}
 	if err := r.Get(ctx, req.NamespacedName, qworker); err != nil {
 		log.Log.Error(err, "unable to fetch QWorker")
 		return ctrl.Result{}, err
 	}
-	QueueLength, err := r.BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
+
+	// Fetch the ScalerConfig referenced in the QWorker
+	var scalerConfig v1alpha1.ScalerConfig
+	if err := r.Get(ctx, client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef}, &scalerConfig); err != nil {
+		log.Log.Error(err, "Failed to get ScalerConfig", "name", qworker.Spec.ScaleConfig.ScalerConfigRef)
+		return ctrl.Result{}, err
+	}
+
+	BrokerClient, err := brokers.NewBroker(&scalerConfig)
+	if err != nil {
+		log.Log.Error(err, "Failed to create broker client")
+		return ctrl.Result{}, err
+	}
+
+	QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -85,7 +98,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
-func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1.QWorker) error {
+func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.QWorker) error {
 	podId := uuid.New().String()
 	qWorker.Spec.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", qWorker.Spec.ObjectMeta.Name, qWorker.Spec.ScaleConfig.Queue, podId)
 	workerPod := &corev1.Pod{
@@ -99,8 +112,22 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1.QWorke
 	qWorker.Status.CurrentReplicas += 1
 	return nil
 }
-func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1.QWorker) error {
-	err := r.BrokerClient.KillQueue(ctx, qworker.Spec.ScaleConfig.Queue)
+func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1.QWorker) error {
+
+	// Fetch the ScalerConfig referenced in the QWorker
+	var scalerConfig v1alpha1.ScalerConfig
+	if err := r.Get(*ctx, client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef}, &scalerConfig); err != nil {
+		log.Log.Error(err, "Failed to get ScalerConfig", "name", qworker.Spec.ScaleConfig.ScalerConfigRef)
+		return err
+	}
+
+	BrokerClient, err := brokers.NewBroker(&scalerConfig)
+	if err != nil {
+		log.Log.Error(err, "Failed to create broker client")
+		return err
+	}
+
+	err = BrokerClient.KillQueue(ctx, qworker.Spec.ScaleConfig.Queue)
 	if err != nil {
 		log.Log.Error(err, "unable to kill queue")
 		return err
@@ -112,7 +139,7 @@ func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1.QWork
 // SetupWithManager sets up the controller with the Manager.
 func (r *QWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&quickcubecomv1alpha1.QWorker{}).
+		For(&v1alpha1.QWorker{}).
 		Named("qscaler").
 		Complete(r)
 }

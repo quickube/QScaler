@@ -33,19 +33,12 @@ type QWorkerStatus struct {
 }
 
 type QWorkerScaleConfig struct {
-	Broker        string       `json:"brokers"`
-	BrokerConfig  BrokerConfig `json:"brokerConfig"`
-	Queue         string       `json:"queue"`
-	MinReplicas   int          `json:"minReplicas"`
-	MaxReplicas   int          `json:"maxReplicas"`
-	ScalingFactor int          `json:"scalingFactor"`
-}
-
-type BrokerConfig struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Password string `json:"password,omitempty"`
-	Db       string `json:"db,omitempty"`
+	Broker          string `json:"brokers"`
+	ScalerConfigRef string `json:"scalerConfigRef"`
+	Queue           string `json:"queue"`
+	MinReplicas     int    `json:"minReplicas"`
+	MaxReplicas     int    `json:"maxReplicas"`
+	ScalingFactor   int    `json:"scalingFactor"`
 }
 
 // +kubebuilder:object:root=true

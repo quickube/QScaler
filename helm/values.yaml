@@ -42,10 +42,6 @@ securityContext: {}
   # runAsNonRoot: true
   # runAsUser: 1000
 
-service:
-  type: ClusterIP
-  port: 80
-
 ingress:
   enabled: false
   className: ""
@@ -77,11 +73,11 @@ resources: {}
 livenessProbe:
   httpGet:
     path: /
-    port: http
+    port: 8081
 readinessProbe:
   httpGet:
     path: /
-    port: http
+    port: 8081
 
 autoscaling:
   enabled: false

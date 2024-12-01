@@ -1,6 +1,6 @@
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: {{ include "qscaler.fullname" . }}
   labels:
@@ -57,7 +57,7 @@ rules:
 ---
 # permissions to do leader election.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   labels:
     {{- include "qscaler.labels" . | nindent 4 }}
@@ -97,29 +97,31 @@ rules:
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   labels:
     {{- include "qscaler.labels" . | nindent 4 }}
   name: {{ include "qscaler.fullname" . }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: {{ include "qscaler.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "qscaler.fullname" . }}
+    name: {{ include "qscaler.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   labels:
     {{- include "qscaler.labels" . | nindent 4 }}
   name: {{ include "qscaler.fullname" . }}-leader-election
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: {{ include "qscaler.fullname" . }}-leader-election
 subjects:
   - kind: ServiceAccount
-    name: {{ include "qscaler.fullname" . }}
+    name: {{ include "qscaler.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}

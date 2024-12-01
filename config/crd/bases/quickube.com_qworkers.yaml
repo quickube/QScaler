@@ -7882,20 +7882,6 @@ spec:
                 type: object
               scaleConfig:
                 properties:
-                  brokerConfig:
-                    properties:
-                      db:
-                        type: string
-                      host:
-                        type: string
-                      password:
-                        type: string
-                      port:
-                        type: integer
-                    required:
-                    - host
-                    - port
-                    type: object
                   brokers:
                     type: string
                   maxReplicas:
@@ -7904,14 +7890,16 @@ spec:
                     type: integer
                   queue:
                     type: string
+                  scalerConfigRef:
+                    type: string
                   scalingFactor:
                     type: integer
                 required:
-                - brokerConfig
                 - brokers
                 - maxReplicas
                 - minReplicas
                 - queue
+                - scalerConfigRef
                 - scalingFactor
                 type: object
             required:

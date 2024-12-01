@@ -43,7 +43,7 @@ spec:
             - --health-probe-bind-address=:8081
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: 8081
               protocol: TCP
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}

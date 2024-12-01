@@ -58,6 +58,11 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 .PHONY: deploy
 deploy: init-kind local-build local-push manifests init-qscaler
 
+.PHONY: clean
+clean:
+	kind delete cluster --name qscaler
+	docker stop kind-registry && docker rm kind-registry
+
 .PHONY: restart
 restart: local-build
 	docker push localhost:5001/qscaler:latest

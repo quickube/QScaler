@@ -19,7 +19,9 @@ package controller
 import (
 	"context"
 	"fmt"
-	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
+
+	"github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/internal/brokers"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -49,9 +51,15 @@ type ScalerConfigReconciler struct {
 func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	scalerConfig := &quickcubecomv1alpha1.ScalerConfig{}
+	scalerConfig := &v1alpha1.ScalerConfig{}
 	if err := r.Get(ctx, req.NamespacedName, scalerConfig); err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
+		return ctrl.Result{}, err
+	}
+
+	_, err := brokers.NewBroker(scalerConfig)
+	if err != nil {
+		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
 		return ctrl.Result{}, err
 	}
 
@@ -62,7 +70,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 // SetupWithManager sets up the controller with the Manager.
 func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&quickcubecomv1alpha1.ScalerConfig{}).
+		For(&v1alpha1.ScalerConfig{}).
 		Named("scalerconfig").
 		Complete(r)
 }
