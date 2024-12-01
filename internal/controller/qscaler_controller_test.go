@@ -27,10 +27,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	githubcomv1 "github.com/quickube/QScale/api/v1"
+	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
 )
 
-var _ = Describe("QScale Controller", func() {
+var _ = Describe("QScaler Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -40,17 +40,18 @@ var _ = Describe("QScale Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		qscale := &githubcomv1.QWorker{}
+		qscaler := &quickcubecomv1alpha1.QScaler{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind QScale")
-			err := k8sClient.Get(ctx, typeNamespacedName, qscale)
+			By("creating the custom resource for the Kind QScaler")
+			err := k8sClient.Get(ctx, typeNamespacedName, qscaler)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &githubcomv1.QWorker{
+				resource := &quickcubecomv1alpha1.QScaler{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
+					// TODO(user): Specify other spec details if needed.
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -58,16 +59,16 @@ var _ = Describe("QScale Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &githubcomv1.QWorker{}
+			resource := &quickcubecomv1alpha1.QScaler{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance QScale")
+			By("Cleanup the specific resource instance QScaler")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &QScaleReconciler{
+			controllerReconciler := &QScalerReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

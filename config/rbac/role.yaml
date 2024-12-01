@@ -31,9 +31,9 @@ rules:
   - patch
   - update
 - apiGroups:
-  - github.com
+  - quickcube.com
   resources:
-  - qworkers
+  - qscalers
   verbs:
   - create
   - delete
@@ -43,15 +43,15 @@ rules:
   - update
   - watch
 - apiGroups:
-  - github.com
+  - quickcube.com
   resources:
-  - qworkers/finalizers
+  - qscalers/finalizers
   verbs:
   - update
 - apiGroups:
-  - github.com
+  - quickcube.com
   resources:
-  - qworkers/status
+  - qscalers/status
   verbs:
   - get
   - patch

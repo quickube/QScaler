@@ -1,16 +1,16 @@
-# permissions for end users to edit qscales.
+# permissions for end users to edit qscalers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: qscale
     app.kubernetes.io/managed-by: kustomize
-  name: qscale-editor-role
+  name: qscaler-editor-role
 rules:
 - apiGroups:
-  - github.com
+  - quickcube.com
   resources:
-  - qscales
+  - qscalers
   verbs:
   - create
   - delete
@@ -20,8 +20,8 @@ rules:
   - update
   - watch
 - apiGroups:
-  - github.com
+  - quickcube.com
   resources:
-  - qscales/status
+  - qscalers/status
   verbs:
   - get
