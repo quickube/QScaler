@@ -40,13 +40,13 @@ var _ = Describe("QScaler Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		qscaler := &quickcubecomv1alpha1.QScaler{}
+		qscaler := &quickcubecomv1alpha1.QWorker{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind QScaler")
 			err := k8sClient.Get(ctx, typeNamespacedName, qscaler)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &quickcubecomv1alpha1.QScaler{
+				resource := &quickcubecomv1alpha1.QWorker{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -59,7 +59,7 @@ var _ = Describe("QScaler Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &quickcubecomv1alpha1.QScaler{}
+			resource := &quickcubecomv1alpha1.QWorker{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -68,7 +68,7 @@ var _ = Describe("QScaler Controller", func() {
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &QScalerReconciler{
+			controllerReconciler := &QWorkerReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

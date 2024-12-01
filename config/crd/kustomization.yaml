@@ -3,6 +3,7 @@
 # It should be run by config/default
 resources:
 - bases/quickcube.com_qscalers.yaml
+- bases/quickcube.com_scalerconfigs.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

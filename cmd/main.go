@@ -21,6 +21,9 @@ import (
 	"flag"
 	"os"
 
+	"github.com/quickube/QScaler/internal/brokers"
+	conf "github.com/quickube/QScaler/internal/config"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -142,11 +145,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.QScalerReconciler{
+	cfg, err := conf.LoadConfig()
+	if err != nil {
+		setupLog.Error(err, "unable to load config")
+		os.Exit(1)
+	}
+	BrokerClient, err := brokers.NewBroker(cfg)
+	if err != nil {
+		setupLog.Error(err, "unable to create BrokerClient")
+		os.Exit(1)
+	}
+
+	if err = (&controller.QWorkerReconciler{
+		Config:       cfg,
+		BrokerClient: BrokerClient,
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "QScaler")
+		os.Exit(1)
+	}
+
+	if err = (&controller.ScalerConfigReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "QScaler")
+		setupLog.Error(err, "unable to create controller", "controller", "ScalerConfig")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

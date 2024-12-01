@@ -18,119 +18,101 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
 	v1 "github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/internal/brokers"
+	conf "github.com/quickube/QScaler/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"math"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"time"
 )
 
-// QScalerReconciler reconciles a QScaler object
-type QScalerReconciler struct {
+// QWorkerReconciler reconciles a QScaler object
+type QWorkerReconciler struct {
+	Config       *conf.GlobalConfig
+	BrokerClient brokers.Broker
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=quickcube.com,resources=qscalers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=quickcube.com,resources=qscalers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickcube.com,resources=qscalers/finalizers,verbs=update
-// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=pods/finalizers,verbs=update
-// +kubebuilder:rbac:groups="",resources=pods/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickcube.com,resources=qworker,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=quickcube.com,resources=qworker/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickcube.com,resources=qworker/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create
 
-func (r *QScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
-	scaler := &v1.QWorker{}
-	if err := r.Get(ctx, req.NamespacedName, scaler); err != nil {
+	qworker := &v1.QWorker{}
+	if err := r.Get(ctx, req.NamespacedName, qworker); err != nil {
 		log.Log.Error(err, "unable to fetch QWorker")
 		return ctrl.Result{}, err
 	}
-	redisClient := GetRedisClient(scaler, &ctx)
-	QLen, err := GetQueueLength(redisClient, scaler, &ctx)
+	QueueLength, err := r.BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	log.Log.Info(fmt.Sprintf("current queue length: %d", QLen))
+	log.Log.Info(fmt.Sprintf("current queue length: %d", QueueLength))
 
-	desiredPodsAmount := min(max(QLen*scaler.Spec.ScaleConfig.ScalingFactor, scaler.Spec.ScaleConfig.MinReplicas), scaler.Spec.ScaleConfig.MaxReplicas)
+	desiredPodsAmount := min(
+		max(QueueLength*qworker.Spec.ScaleConfig.ScalingFactor, qworker.Spec.ScaleConfig.MinReplicas),
+		qworker.Spec.ScaleConfig.MaxReplicas)
 	log.Log.Info(fmt.Sprintf("desired amount: %d", desiredPodsAmount))
-	scaler.Status.DesiredReplicas = desiredPodsAmount
+	qworker.Status.DesiredReplicas = desiredPodsAmount
 
-	diffAmount := int64(math.Abs(float64(scaler.Status.DesiredReplicas - scaler.Status.CurrentReplicas)))
+	diffAmount := qworker.Status.DesiredReplicas - qworker.Status.CurrentReplicas
 	log.Log.Info(fmt.Sprintf("going to deploy / takedown: %d pods", diffAmount))
 
-	if scaler.Status.DesiredReplicas > scaler.Status.CurrentReplicas {
+	if diffAmount > 0 {
 		for _ = range diffAmount {
-			if err := r.StartWorker(scaler, &ctx); err != nil {
+			if err := r.StartWorker(&ctx, qworker); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
-	} else {
-		for _ = range diffAmount {
-			if err := r.RemoveWorker(scaler, redisClient, &ctx); err != nil {
+	} else if diffAmount < 0 {
+		for _ = range diffAmount * -1 {
+			if err := r.RemoveWorker(&ctx, qworker); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	}
 
-	if err := r.Status().Update(ctx, scaler); err != nil {
+	if err := r.Status().Update(ctx, qworker); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
-func (r *QScalerReconciler) StartWorker(scaler *v1.QWorker, ctx *context.Context) error {
+func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1.QWorker) error {
 	podId := uuid.New().String()
-	scaler.Spec.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", scaler.Spec.ObjectMeta.Name, scaler.Spec.ScaleConfig.Queue, podId)
+	qWorker.Spec.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", qWorker.Spec.ObjectMeta.Name, qWorker.Spec.ScaleConfig.Queue, podId)
 	workerPod := &corev1.Pod{
-		ObjectMeta: scaler.Spec.ObjectMeta,
-		Spec:       scaler.Spec.PodSpec,
+		ObjectMeta: qWorker.Spec.ObjectMeta,
+		Spec:       qWorker.Spec.PodSpec,
 	}
 	if err := r.Create(*ctx, workerPod); err != nil {
 		log.Log.Error(err, "unable to start worker pod")
 		return err
 	}
-	scaler.Status.CurrentReplicas += 1
+	qWorker.Status.CurrentReplicas += 1
 	return nil
 }
-func (r *QScalerReconciler) RemoveWorker(scaler *v1.QWorker, redisClient *redis.Client, ctx *context.Context) error {
-	status := redisClient.LPush(*ctx, scaler.GetDeathQueue(), "{'kill': 'true'}")
-	if status.String() == "error" {
-		return errors.New(status.String())
-	}
-	log.Log.Info(fmt.Sprintf("published message to death queue: %s", status))
-	scaler.Status.CurrentReplicas -= 1
-	return nil
-}
-
-func GetRedisClient(scaler *v1.QWorker, ctx *context.Context) *redis.Client {
-	Rclient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", scaler.Spec.ScaleConfig.BrokerConfig.Host, scaler.Spec.ScaleConfig.BrokerConfig.Port),
-		Password: scaler.Spec.ScaleConfig.BrokerConfig.Password,
-	})
-	redisStatus := Rclient.Ping(*ctx)
-	log.Log.Info(fmt.Sprintf("Redis Status: %v", redisStatus))
-	return Rclient
-}
-
-func GetQueueLength(redisClient *redis.Client, scaler *v1.QWorker, ctx *context.Context) (int64, error) {
-	taskQueueLength, err := redisClient.LLen(*ctx, scaler.Spec.ScaleConfig.Queue).Result()
+func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1.QWorker) error {
+	err := r.BrokerClient.KillQueue(ctx, qworker.Spec.ScaleConfig.Queue)
 	if err != nil {
-		return -1, err
+		log.Log.Error(err, "unable to kill queue")
+		return err
 	}
-	return taskQueueLength, nil
+	qworker.Status.CurrentReplicas -= 1
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *QScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *QWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&quickcubecomv1alpha1.QWorker{}).
 		Named("qscaler").

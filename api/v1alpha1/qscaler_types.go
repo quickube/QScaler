@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -29,17 +28,17 @@ type QWorkerSpec struct {
 }
 
 type QWorkerStatus struct {
-	CurrentReplicas int64 `json:"currentReplicas"`
-	DesiredReplicas int64 `json:"desiredReplicas"`
+	CurrentReplicas int `json:"currentReplicas"`
+	DesiredReplicas int `json:"desiredReplicas"`
 }
 
 type QWorkerScaleConfig struct {
-	Broker        string       `json:"broker"`
+	Broker        string       `json:"brokers"`
 	BrokerConfig  BrokerConfig `json:"brokerConfig"`
 	Queue         string       `json:"queue"`
-	MinReplicas   int64        `json:"minReplicas"`
-	MaxReplicas   int64        `json:"maxReplicas"`
-	ScalingFactor int64        `json:"scalingFactor"`
+	MinReplicas   int          `json:"minReplicas"`
+	MaxReplicas   int          `json:"maxReplicas"`
+	ScalingFactor int          `json:"scalingFactor"`
 }
 
 type BrokerConfig struct {
@@ -58,10 +57,6 @@ type QWorker struct {
 
 	Spec   QWorkerSpec   `json:"spec,omitempty"`
 	Status QWorkerStatus `json:"status,omitempty"`
-}
-
-func (r *QWorker) GetDeathQueue() string {
-	return fmt.Sprintf("death-%s", r.Spec.ScaleConfig.Queue)
 }
 
 // +kubebuilder:object:root=true

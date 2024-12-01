@@ -10,30 +10,13 @@ rules:
   - pods
   verbs:
   - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - pods/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - ""
-  resources:
-  - pods/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - quickcube.com
   resources:
-  - qscalers
+  - qworker
   verbs:
   - create
   - delete
@@ -45,14 +28,27 @@ rules:
 - apiGroups:
   - quickcube.com
   resources:
-  - qscalers/finalizers
+  - qworker/finalizers
+  - scalerconfigs/finalizers
   verbs:
   - update
 - apiGroups:
   - quickcube.com
   resources:
-  - qscalers/status
+  - qworker/status
+  - scalerconfigs/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - quickcube.com
+  resources:
+  - scalerconfigs
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
