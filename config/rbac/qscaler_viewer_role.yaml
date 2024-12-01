@@ -1,23 +1,23 @@
-# permissions for end users to view qscales.
+# permissions for end users to view qscalers.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: qscale
     app.kubernetes.io/managed-by: kustomize
-  name: qscale-viewer-role
+  name: qscaler-viewer-role
 rules:
 - apiGroups:
-  - github.com
+  - quickcube.com
   resources:
-  - qscales
+  - qscalers
   verbs:
   - get
   - list
   - watch
 - apiGroups:
-  - github.com
+  - quickcube.com
   resources:
-  - qscales/status
+  - qscalers/status
   verbs:
   - get

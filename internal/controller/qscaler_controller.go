@@ -22,7 +22,8 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
-	v1 "github.com/quickube/QScale/api/v1"
+	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
+	v1 "github.com/quickube/QScaler/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"math"
@@ -32,20 +33,20 @@ import (
 	"time"
 )
 
-// QScaleReconciler reconciles a QScale object
-type QScaleReconciler struct {
+// QScalerReconciler reconciles a QScaler object
+type QScalerReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=github.com,resources=qworkers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=github.com,resources=qworkers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=github.com,resources=qworkers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=quickcube.com,resources=qscalers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=quickcube.com,resources=qscalers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickcube.com,resources=qscalers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=pods/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=pods/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=pods/status,verbs=get;update;patch
 
-func (r *QScaleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *QScalerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	scaler := &v1.QWorker{}
 	if err := r.Get(ctx, req.NamespacedName, scaler); err != nil {
@@ -86,7 +87,7 @@ func (r *QScaleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
 }
 
-func (r *QScaleReconciler) StartWorker(scaler *v1.QWorker, ctx *context.Context) error {
+func (r *QScalerReconciler) StartWorker(scaler *v1.QWorker, ctx *context.Context) error {
 	podId := uuid.New().String()
 	scaler.Spec.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", scaler.Spec.ObjectMeta.Name, scaler.Spec.ScaleConfig.Queue, podId)
 	workerPod := &corev1.Pod{
@@ -100,7 +101,7 @@ func (r *QScaleReconciler) StartWorker(scaler *v1.QWorker, ctx *context.Context)
 	scaler.Status.CurrentReplicas += 1
 	return nil
 }
-func (r *QScaleReconciler) RemoveWorker(scaler *v1.QWorker, redisClient *redis.Client, ctx *context.Context) error {
+func (r *QScalerReconciler) RemoveWorker(scaler *v1.QWorker, redisClient *redis.Client, ctx *context.Context) error {
 	status := redisClient.LPush(*ctx, scaler.GetDeathQueue(), "{'kill': 'true'}")
 	if status.String() == "error" {
 		return errors.New(status.String())
@@ -129,9 +130,9 @@ func GetQueueLength(redisClient *redis.Client, scaler *v1.QWorker, ctx *context.
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *QScaleReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *QScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.QWorker{}).
-		Named("qscale").
+		For(&quickcubecomv1alpha1.QWorker{}).
+		Named("qscaler").
 		Complete(r)
 }

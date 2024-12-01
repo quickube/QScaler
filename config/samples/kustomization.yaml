@@ -1,4 +1,4 @@
 ## Append samples of your project ##
 resources:
-- v1_qworker.yaml
+- v1alpha1_qscaler.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

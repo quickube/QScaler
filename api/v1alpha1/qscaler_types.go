@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package v1alpha1
 
 import (
 	"fmt"
@@ -22,17 +22,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// QScaleSpec defines the desired state of QScale.
 type QWorkerSpec struct {
 	ObjectMeta  metav1.ObjectMeta  `json:"ObjectMeta"`
 	PodSpec     corev1.PodSpec     `json:"podSpec"`
 	ScaleConfig QWorkerScaleConfig `json:"scaleConfig,omitempty"`
 }
 
-// QScaleStatus defines the observed state of QScale.
 type QWorkerStatus struct {
 	CurrentReplicas int64 `json:"currentReplicas"`
 	DesiredReplicas int64 `json:"desiredReplicas"`
@@ -57,7 +52,6 @@ type BrokerConfig struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// QScale is the Schema for the qscales API.
 type QWorker struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -72,7 +66,6 @@ func (r *QWorker) GetDeathQueue() string {
 
 // +kubebuilder:object:root=true
 
-// QScaleList contains a list of QScale.
 type QWorkerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
