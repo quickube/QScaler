@@ -14,7 +14,7 @@ rules:
   - list
   - watch
 - apiGroups:
-  - quickcube.com
+  - quickube.com
   resources:
   - qworker
   verbs:
@@ -26,14 +26,14 @@ rules:
   - update
   - watch
 - apiGroups:
-  - quickcube.com
+  - quickube.com
   resources:
   - qworker/finalizers
   - scalerconfigs/finalizers
   verbs:
   - update
 - apiGroups:
-  - quickcube.com
+  - quickube.com
   resources:
   - qworker/status
   - scalerconfigs/status
@@ -42,7 +42,7 @@ rules:
   - patch
   - update
 - apiGroups:
-  - quickcube.com
+  - quickube.com
   resources:
   - scalerconfigs
   verbs:

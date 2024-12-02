@@ -37,8 +37,6 @@ spec:
             type: object
           spec:
             properties:
-              ObjectMeta:
-                type: object
               podSpec:
                 description: PodSpec is a description of a pod.
                 properties:
@@ -7882,8 +7880,6 @@ spec:
                 type: object
               scaleConfig:
                 properties:
-                  brokers:
-                    type: string
                   maxReplicas:
                     type: integer
                   minReplicas:
@@ -7895,7 +7891,6 @@ spec:
                   scalingFactor:
                     type: integer
                 required:
-                - brokers
                 - maxReplicas
                 - minReplicas
                 - queue
@@ -7903,7 +7898,6 @@ spec:
                 - scalingFactor
                 type: object
             required:
-            - ObjectMeta
             - podSpec
             type: object
           status:

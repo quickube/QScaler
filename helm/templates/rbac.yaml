@@ -16,36 +16,9 @@ rules:
   - list
   - watch
 - apiGroups:
-  - quickcube.com
+  - quickube.com
   resources:
-  - qworker
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - quickcube.com
-  resources:
-  - qworker/finalizers
-  - scalerconfigs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - quickcube.com
-  resources:
-  - qworker/status
-  - scalerconfigs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - quickcube.com
-  resources:
+  - qworkers
   - scalerconfigs
   verbs:
   - create
@@ -54,6 +27,22 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - quickube.com
+  resources:
+  - qworker/finalizers
+  - scalerconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - quickube.com
+  resources:
+  - qworker/status
+  - scalerconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
 ---
 # permissions to do leader election.
 apiVersion: rbac.authorization.k8s.io/v1

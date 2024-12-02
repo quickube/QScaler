@@ -37,9 +37,9 @@ type QWorkerReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=quickcube.com,resources=qworker,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=quickcube.com,resources=qworker/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickcube.com,resources=qworker/finalizers,verbs=update
+// +kubebuilder:rbac:groups=quickube.com,resources=qworker,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=quickube.com,resources=qworker/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=qworker/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create
 
 func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -52,8 +52,9 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Fetch the ScalerConfig referenced in the QWorker
 	var scalerConfig v1alpha1.ScalerConfig
-	if err := r.Get(ctx, client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef}, &scalerConfig); err != nil {
-		log.Log.Error(err, "Failed to get ScalerConfig", "name", qworker.Spec.ScaleConfig.ScalerConfigRef)
+	namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
+	if err := r.Get(ctx, namespacedName, &scalerConfig); err != nil {
+		log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
 		return ctrl.Result{}, err
 	}
 
@@ -65,6 +66,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
 	if err != nil {
+		log.Log.Error(err, "Failed to get queue length")
 		return ctrl.Result{}, err
 	}
 	log.Log.Info(fmt.Sprintf("current queue length: %d", QueueLength))
@@ -100,9 +102,9 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.QWorker) error {
 	podId := uuid.New().String()
-	qWorker.Spec.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", qWorker.Spec.ObjectMeta.Name, qWorker.Spec.ScaleConfig.Queue, podId)
+	qWorker.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", qWorker.ObjectMeta.Name, qWorker.Spec.ScaleConfig.Queue, podId)
 	workerPod := &corev1.Pod{
-		ObjectMeta: qWorker.Spec.ObjectMeta,
+		ObjectMeta: qWorker.ObjectMeta,
 		Spec:       qWorker.Spec.PodSpec,
 	}
 	if err := r.Create(*ctx, workerPod); err != nil {
@@ -114,10 +116,10 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 }
 func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1.QWorker) error {
 
-	// Fetch the ScalerConfig referenced in the QWorker
 	var scalerConfig v1alpha1.ScalerConfig
-	if err := r.Get(*ctx, client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef}, &scalerConfig); err != nil {
-		log.Log.Error(err, "Failed to get ScalerConfig", "name", qworker.Spec.ScaleConfig.ScalerConfigRef)
+	namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
+	if err := r.Get(*ctx, namespacedName, &scalerConfig); err != nil {
+		log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
 		return err
 	}
 

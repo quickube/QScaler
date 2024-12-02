@@ -16,7 +16,7 @@ type RedisBroker struct {
 }
 
 type RedisConfig struct {
-	Address  string `json:"host"`
+	Host     string `json:"host"`
 	Port     string `json:"port"`
 	Password string `json:"password"`
 }
@@ -39,9 +39,9 @@ func (r *RedisBroker) GetQueueLength(ctx *context.Context, topic string) (int, e
 	return int(taskQueueLength), nil
 }
 
-func (r *RedisBroker) IsConnected(ctx *context.Context) bool {
+func (r *RedisBroker) IsConnected(ctx *context.Context) (bool, error) {
 	status := r.client.Ping(*ctx)
-	return status.Err() == nil
+	return status.Err() == nil, status.Err()
 }
 
 func (r *RedisBroker) GetDeathQueue(topic string) string {
@@ -56,7 +56,7 @@ func NewRedisClient(config *quickcubecomv1alpha1.ScalerConfig) (*RedisBroker, er
 	}
 
 	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", redisConfig.Address, redisConfig.Port),
+		Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
 		Password: redisConfig.Password,
 	})
 

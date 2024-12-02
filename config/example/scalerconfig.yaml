@@ -1,0 +1,9 @@
+apiVersion: quickube.com/v1alpha1
+kind: ScalerConfig
+metadata:
+  name: redis-config
+type: redis
+spec:
+  host: tcp://redis-master
+  port: "6379"
+  password: Aa123456

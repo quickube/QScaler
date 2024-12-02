@@ -35,9 +35,9 @@ type ScalerConfigReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=quickcube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=quickcube.com,resources=scalerconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickcube.com,resources=scalerconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -57,13 +57,31 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	_, err := brokers.NewBroker(scalerConfig)
+	broker, err := brokers.NewBroker(scalerConfig)
 	if err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
 		return ctrl.Result{}, err
 	}
 
-	log.Log.Info("ScalerConfig reconciled", "name", scalerConfig.Name)
+	if ok, err := broker.IsConnected(&ctx); !ok || err != nil {
+		scalerConfig.Status.Healthy = false
+		scalerConfig.Status.Message = "Failed to connect to broker"
+		log.Log.Error(err, "Failed to connect to broker", "name", req.NamespacedName)
+		if err = r.Status().Update(ctx, scalerConfig); err != nil {
+			log.Log.Error(err, "Failed to update scalerConfig status", "name", req.NamespacedName)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, err
+	} else {
+		scalerConfig.Status.Healthy = true
+		scalerConfig.Status.Message = "Connected to broker"
+		if err = r.Status().Update(ctx, scalerConfig); err != nil {
+			log.Log.Error(err, "Failed to update scalerConfig status", "name", req.NamespacedName)
+			return ctrl.Result{}, err
+		}
+	}
+
+	log.Log.Info("ScalerConfig reconciled", "name", req.NamespacedName)
 	return ctrl.Result{}, nil
 }
 

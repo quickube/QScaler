@@ -18,10 +18,6 @@ spec:
     schema:
       openAPIV3Schema:
         properties:
-          Spec:
-            additionalProperties:
-              type: string
-            type: object
           apiVersion:
             description: |-
               APIVersion defines the versioned schema of this representation of an object.
@@ -39,6 +35,10 @@ spec:
             type: string
           metadata:
             type: object
+          spec:
+            additionalProperties:
+              type: string
+            type: object
           status:
             properties:
               healthy:
@@ -49,7 +49,7 @@ spec:
           type:
             type: string
         required:
-        - Spec
+        - spec
         - type
         type: object
     served: true

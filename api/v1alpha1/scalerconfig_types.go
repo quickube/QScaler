@@ -27,7 +27,7 @@ type ScalerConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Type              string             `json:"type"`
-	Spec              map[string]string  `json:"Spec"`
+	Spec              map[string]string  `json:"spec"`
 	Status            ScalerConfigStatus `json:"status,omitempty"`
 }
 

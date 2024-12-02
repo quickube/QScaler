@@ -1,3 +1,4 @@
 image:
   tag: latest
   repository: localhost:5001
+  pullPolicy: Always

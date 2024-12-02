@@ -2,7 +2,7 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: quickcube.com
+domain: quickube.com
 layout:
 - go.kubebuilder.io/v4
 projectName: qscale
@@ -12,12 +12,12 @@ resources:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: quickcube.com
+  domain: quickube.com
   kind: QScaler
   path: github.com/quickube/QScaler/api/v1alpha1
   version: v1alpha1
 - controller: true
-  domain: quickcube.com
+  domain: quickube.com
   kind: ScalerConfig
   version: v1alpha1
 version: "3"

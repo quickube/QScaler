@@ -22,7 +22,6 @@ import (
 )
 
 type QWorkerSpec struct {
-	ObjectMeta  metav1.ObjectMeta  `json:"ObjectMeta"`
 	PodSpec     corev1.PodSpec     `json:"podSpec"`
 	ScaleConfig QWorkerScaleConfig `json:"scaleConfig,omitempty"`
 }
@@ -33,7 +32,6 @@ type QWorkerStatus struct {
 }
 
 type QWorkerScaleConfig struct {
-	Broker          string `json:"brokers"`
 	ScalerConfigRef string `json:"scalerConfigRef"`
 	Queue           string `json:"queue"`
 	MinReplicas     int    `json:"minReplicas"`

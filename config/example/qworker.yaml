@@ -1,0 +1,20 @@
+apiVersion: quickube.com/v1alpha1
+kind: QWorker
+metadata:
+  labels:
+    app.kubernetes.io/name: qworker
+    app.kubernetes.io/managed-by: kustomize
+  name: qworker-example
+spec:
+  podSpec:
+    containers:
+      - name: main
+        image: busybox
+        command: [sleep]
+        args: ["9999"]
+  scaleConfig:
+    queue: "q1"
+    minReplicas: 3
+    maxReplicas: 20
+    scalerConfigRef: redis-config
+    scalingFactor: 1
