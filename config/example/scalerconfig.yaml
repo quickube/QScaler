@@ -4,6 +4,6 @@ metadata:
   name: redis-config
 type: redis
 spec:
-  host: tcp://redis-master
+  host: redis-master
   port: "6379"
   password: Aa123456
