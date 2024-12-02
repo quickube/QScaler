@@ -25,6 +25,7 @@ import (
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,9 +38,9 @@ type QWorkerReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=quickube.com,resources=qworker,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=quickube.com,resources=qworker/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworker/finalizers,verbs=update
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create
 
 func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -102,10 +103,13 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.QWorker) error {
 	podId := uuid.New().String()
-	qWorker.ObjectMeta.Name = fmt.Sprintf("%s-%s-%s", qWorker.ObjectMeta.Name, qWorker.Spec.ScaleConfig.Queue, podId)
+	qWorker.ObjectMeta.Name = podId
 	workerPod := &corev1.Pod{
-		ObjectMeta: qWorker.ObjectMeta,
-		Spec:       qWorker.Spec.PodSpec,
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      qWorker.ObjectMeta.Name,
+			Namespace: qWorker.ObjectMeta.Namespace,
+		},
+		Spec: qWorker.Spec.PodSpec,
 	}
 	if err := r.Create(*ctx, workerPod); err != nil {
 		log.Log.Error(err, "unable to start worker pod")

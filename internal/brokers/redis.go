@@ -50,7 +50,7 @@ func (r *RedisBroker) GetDeathQueue(topic string) string {
 
 func NewRedisClient(config *quickcubecomv1alpha1.ScalerConfig) (*RedisBroker, error) {
 	redisConfig := &RedisConfig{}
-	err := mapstructure.Decode(config, &redisConfig)
+	err := mapstructure.Decode(config.Spec, &redisConfig)
 	if err != nil {
 		return nil, err
 	}
