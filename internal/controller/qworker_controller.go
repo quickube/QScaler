@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"time"
 
 	"github.com/quickube/QScaler/api/v1alpha1"
@@ -48,6 +49,18 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	qworker := &v1alpha1.QWorker{}
 	if err := r.Get(ctx, req.NamespacedName, qworker); err != nil {
 		log.Log.Error(err, "unable to fetch QWorker")
+		return ctrl.Result{}, err
+	}
+
+	var podList corev1.PodList
+	if err := r.List(ctx, &podList, client.InNamespace(req.Namespace), client.MatchingFields{"metadata.ownerReferences.name": qworker.Name}); err != nil {
+		return ctrl.Result{}, err
+	}
+	currentPodCount := len(podList.Items)
+	qworker.Status.CurrentReplicas = currentPodCount
+
+	if err := r.Status().Update(ctx, qworker); err != nil {
+		log.Log.Error(err, fmt.Sprintf("Failed to update QWorker status %s", qworker.Name))
 		return ctrl.Result{}, err
 	}
 
@@ -95,7 +108,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %s", qworker.Name, qworker.Status.CurrentReplicas))
+	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %d", qworker.Name, qworker.Status.CurrentReplicas))
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -106,12 +119,19 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 	log.Log.Info("Starting worker", "name", qWorker.Name)
 	podId := fmt.Sprintf("%s-%s", qWorker.ObjectMeta.Name, uuid.New().String())
 	workerPod := &corev1.Pod{
+
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podId,
 			Namespace: qWorker.ObjectMeta.Namespace,
 		},
 		Spec: qWorker.Spec.PodSpec,
 	}
+
+	// Set QWorker as the owner of the Pod
+	if err := controllerutil.SetControllerReference(qWorker, workerPod, r.Scheme); err != nil {
+		return err
+	}
+
 	if err := r.Create(*ctx, workerPod); err != nil {
 		log.Log.Error(err, "unable to start worker pod")
 		return err
@@ -145,8 +165,22 @@ func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *QWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Add a field indexer for the ownerReferences.name field
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &corev1.Pod{}, "metadata.ownerReferences.name", func(rawObj client.Object) []string {
+		pod := rawObj.(*corev1.Pod)
+		ownerRefs := pod.GetOwnerReferences()
+		for _, ref := range ownerRefs {
+			if ref.Kind == "QWorker" {
+				return []string{ref.Name}
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.QWorker{}).
-		Named("qscaler").
+		Named("qworker").
 		Complete(r)
 }
