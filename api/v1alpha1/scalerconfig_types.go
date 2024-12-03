@@ -17,47 +17,33 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-type QWorkerSpec struct {
-	PodSpec     corev1.PodSpec     `json:"podSpec"`
-	ScaleConfig QWorkerScaleConfig `json:"scaleConfig,omitempty"`
-}
-
-type QWorkerStatus struct {
-	CurrentReplicas int `json:"currentReplicas"`
-	DesiredReplicas int `json:"desiredReplicas"`
-}
-
-type QWorkerScaleConfig struct {
-	ScalerConfigRef string `json:"scalerConfigRef"`
-	Queue           string `json:"queue"`
-	MinReplicas     int    `json:"minReplicas"`
-	MaxReplicas     int    `json:"maxReplicas"`
-	ScalingFactor   int    `json:"scalingFactor"`
-}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-type QWorker struct {
+type ScalerConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Type              string             `json:"type"`
+	Spec              map[string]string  `json:"spec"`
+	Status            ScalerConfigStatus `json:"status,omitempty"`
+}
 
-	Spec   QWorkerSpec   `json:"spec,omitempty"`
-	Status QWorkerStatus `json:"status,omitempty"`
+type ScalerConfigStatus struct {
+	Healthy bool   `json:"healthy,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-type QWorkerList struct {
+type ScalerConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []QWorker `json:"items"`
+	Items           []ScalerConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&QWorker{}, &QWorkerList{})
+	SchemeBuilder.Register(&ScalerConfig{}, &ScalerConfigList{})
 }

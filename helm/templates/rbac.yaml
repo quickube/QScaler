@@ -1,0 +1,116 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "qscaler.fullname" . }}
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - quickube.com
+  resources:
+  - qworkers
+  - scalerconfigs
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - quickube.com
+  resources:
+  - qworkers/finalizers
+  - scalerconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - quickube.com
+  resources:
+  - qworkers/status
+  - scalerconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+# permissions to do leader election.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+  name: {{ include "qscaler.fullname" . }}-leader-election
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+  name: {{ include "qscaler.fullname" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "qscaler.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "qscaler.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+  name: {{ include "qscaler.fullname" . }}-leader-election
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "qscaler.fullname" . }}-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "qscaler.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
