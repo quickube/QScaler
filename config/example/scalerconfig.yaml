@@ -4,6 +4,6 @@ metadata:
   name: redis-config
 type: redis
 spec:
-  host: redis-master
+  host: redis-master.default.svc.cluster.local
   port: "6379"
   password: Aa123456

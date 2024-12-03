@@ -19,13 +19,13 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
-
 	"github.com/google/uuid"
-	"github.com/quickube/QScaler/api/v1alpha1"
-	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
+
+	"github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/internal/brokers"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -95,6 +95,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %s", qworker.Name, qworker.Status.CurrentReplicas))
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -102,11 +103,11 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.QWorker) error {
-	podId := uuid.New().String()
-	qWorker.ObjectMeta.Name = podId
+	log.Log.Info("Starting worker", "name", qWorker.Name)
+	podId := fmt.Sprintf("%s-%s", qWorker.ObjectMeta.Name, uuid.New().String())
 	workerPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      qWorker.ObjectMeta.Name,
+			Name:      podId,
 			Namespace: qWorker.ObjectMeta.Namespace,
 		},
 		Spec: qWorker.Spec.PodSpec,

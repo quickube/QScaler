@@ -30,14 +30,14 @@ rules:
 - apiGroups:
   - quickube.com
   resources:
-  - qworker/finalizers
+  - qworkers/finalizers
   - scalerconfigs/finalizers
   verbs:
   - update
 - apiGroups:
   - quickube.com
   resources:
-  - qworker/status
+  - qworkers/status
   - scalerconfigs/status
   verbs:
   - get
