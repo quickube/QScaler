@@ -36,8 +36,21 @@ spec:
           metadata:
             type: object
           spec:
-            additionalProperties:
-              type: string
+            properties:
+              host:
+                type: string
+              isPasswordSecret:
+                type: string
+              password:
+                type: string
+              port:
+                format: int32
+                type: integer
+            required:
+            - host
+            - isPasswordSecret
+            - password
+            - port
             type: object
           status:
             properties:

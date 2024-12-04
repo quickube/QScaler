@@ -27,8 +27,15 @@ type ScalerConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	Type              string             `json:"type"`
-	Spec              map[string]string  `json:"spec"`
+	Spec              ScalerSpec         `json:"spec"`
 	Status            ScalerConfigStatus `json:"status,omitempty"`
+}
+
+type ScalerSpec struct {
+	Host             string `json:"host"`
+	Port             int32  `json:"port"`
+	Password         string `json:"password"`
+	IsPasswordSecret bool   `json:"isPasswordSecret"`
 }
 
 type ScalerConfigStatus struct {
@@ -44,6 +51,9 @@ type ScalerConfigList struct {
 	Items           []ScalerConfig `json:"items"`
 }
 
+func (r ScalerConfig) extractPasswordFromSecret(secretName string) string {
+	return "Sdf"
+}
 func init() {
 	SchemeBuilder.Register(&ScalerConfig{}, &ScalerConfigList{})
 }

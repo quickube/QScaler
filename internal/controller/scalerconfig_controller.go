@@ -57,6 +57,11 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
+	if scalerConfig.Spec.IsPasswordSecret {
+		scalerConfig.Spec.Password = scalerConfig.extractPasswordFromSecret(scalerConfig.Spec.Password)
+		scalerConfig.Spec.IsPasswordSecret = false
+	}
+
 	broker, err := brokers.NewBroker(scalerConfig)
 	if err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
