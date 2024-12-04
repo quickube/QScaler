@@ -51,9 +51,6 @@ type ScalerConfigList struct {
 	Items           []ScalerConfig `json:"items"`
 }
 
-func (r ScalerConfig) extractPasswordFromSecret(secretName string) string {
-	return "Sdf"
-}
 func init() {
 	SchemeBuilder.Register(&ScalerConfig{}, &ScalerConfigList{})
 }
