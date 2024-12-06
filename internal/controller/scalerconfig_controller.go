@@ -40,16 +40,8 @@ type ScalerConfigReconciler struct {
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ScalerConfig object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.1/pkg/reconcile
 func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
@@ -59,16 +51,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	if scalerConfig.Spec.IsPasswordSecret {
-		actualPassword, err := r.ExtractPasswordFromSecret(scalerConfig.Spec.Password, scalerConfig.Namespace, ctx)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		scalerConfig.Spec.Password = actualPassword
-		scalerConfig.Spec.IsPasswordSecret = false
-	}
-
-	broker, err := brokers.NewBroker(scalerConfig)
+	broker, err := brokers.NewBroker(ctx, r.Client, scalerConfig)
 	if err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
 		return ctrl.Result{}, err

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,16 +27,32 @@ import (
 type ScalerConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Type              string             `json:"type"`
-	Spec              ScalerSpec         `json:"spec"`
+	Spec              ScalerConfigSpec   `json:"spec"`
 	Status            ScalerConfigStatus `json:"status,omitempty"`
 }
 
-type ScalerSpec struct {
-	Host             string `json:"host"`
-	Port             int32  `json:"port"`
-	Password         string `json:"password"`
-	IsPasswordSecret bool   `json:"isPasswordSecret"`
+type ScalerConfigSpec struct {
+	Type   string        `json:"type"`
+	Config ScalerConfigs `json:"config"`
+}
+
+type ScalerConfigs struct {
+	RedisConfig `json:",inline"`
+}
+
+type RedisConfig struct {
+	Host     string        `json:"host"`
+	Port     string        `json:"port"`
+	Password ValueOrSecret `json:"password"`
+}
+
+type ValueOrSecret struct {
+	Value     string            `json:"value,omitempty"`
+	ValueFrom PasswordValSource `json:"valueFrom,omitempty"`
+}
+
+type PasswordValSource struct {
+	SecretKeyRef corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
 type ScalerConfigStatus struct {

@@ -43,6 +43,7 @@ type QWorkerReconciler struct {
 // +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
@@ -72,7 +73,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	BrokerClient, err := brokers.NewBroker(&scalerConfig)
+	BrokerClient, err := brokers.NewBroker(ctx, r.Client, &scalerConfig)
 	if err != nil {
 		log.Log.Error(err, "Failed to create broker client")
 		return ctrl.Result{Requeue: true}, err
@@ -151,7 +152,7 @@ func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1
 		return err
 	}
 
-	BrokerClient, err := brokers.NewBroker(&scalerConfig)
+	BrokerClient, err := brokers.NewBroker(*ctx, r.Client, &scalerConfig)
 	if err != nil {
 		log.Log.Error(err, "Failed to create broker client")
 		return err
