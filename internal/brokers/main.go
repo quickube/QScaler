@@ -7,7 +7,6 @@ import (
 	"github.com/quickube/QScaler/api/v1alpha1"
 	qconfig "github.com/quickube/QScaler/internal/qconfig"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sync"
 )
 
 var (

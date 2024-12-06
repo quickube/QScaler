@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/go-redis/redis/v8"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
