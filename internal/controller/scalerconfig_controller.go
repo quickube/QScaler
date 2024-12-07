@@ -20,9 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 
@@ -78,20 +75,6 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.Log.Info("ScalerConfig reconciled", "name", req.NamespacedName)
 	return ctrl.Result{}, nil
-}
-
-func (r *ScalerConfigReconciler) ExtractPasswordFromSecret(secretRef string, namespace string, ctx context.Context) (string, error) {
-
-	// Fetch the referenced Secret
-	var secret corev1.Secret
-	secretName := types.NamespacedName{
-		Name:      secretRef,
-		Namespace: namespace,
-	}
-	if err := r.Get(ctx, secretName, &secret); err != nil {
-		return "", err
-	}
-	return secret.Name, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
