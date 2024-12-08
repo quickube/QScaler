@@ -50,7 +50,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 	if err := qconfig.FetchSecretsFromReferences(ctx, r.Client, scalerConfig); err != nil {
-		return ctrl.Result{}, err
+		log.Log.Error(err, fmt.Sprintf("Failed to fetch Secrets for ScalerConfig %s", req.NamespacedName))
 	}
 
 	broker, err := brokers.NewBroker(scalerConfig)
