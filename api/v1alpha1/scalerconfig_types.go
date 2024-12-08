@@ -32,11 +32,11 @@ type ScalerConfig struct {
 }
 
 type ScalerConfigSpec struct {
-	Type   string        `json:"type"`
-	Config ScalerConfigs `json:"config"`
+	Type   string            `json:"type"`
+	Config ScalerTypeConfigs `json:"config"`
 }
 
-type ScalerConfigs struct {
+type ScalerTypeConfigs struct {
 	RedisConfig `json:",inline"`
 }
 
@@ -47,11 +47,11 @@ type RedisConfig struct {
 }
 
 type ValueOrSecret struct {
-	Value     string            `json:"value,omitempty"`
-	ValueFrom PasswordValSource `json:"valueFrom,omitempty"`
+	Value     string       `json:"value,omitempty"`
+	ValueFrom ValueSources `json:"valueFrom,omitempty"`
 }
 
-type PasswordValSource struct {
+type ValueSources struct {
 	SecretKeyRef corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 

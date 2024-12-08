@@ -5,8 +5,6 @@ import (
 	"sync"
 
 	"github.com/quickube/QScaler/api/v1alpha1"
-	qconfig "github.com/quickube/QScaler/internal/qconfig"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -14,13 +12,9 @@ var (
 	RegistryMutex  sync.Mutex
 )
 
-func NewBroker(ctx context.Context, client client.Client, config *v1alpha1.ScalerConfig) (Broker, error) {
+func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
 	switch config.Spec.Type {
 	case "redis":
-		if err := qconfig.UpdateConfigPasswordValue(ctx, client, config); err != nil {
-			return nil, err
-		}
-
 		redisConfig := &RedisConfig{
 			Host:     config.Spec.Config.Host,
 			Port:     config.Spec.Config.Port,

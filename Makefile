@@ -64,7 +64,7 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: deploy
-deploy: init-kind local-build local-push manifests init-qscaler
+deploy: init-kind init-redis local-build local-push manifests init-qscaler
 
 .PHONY: clean
 clean:

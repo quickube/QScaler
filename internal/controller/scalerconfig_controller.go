@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"github.com/quickube/QScaler/internal/qconfig"
 
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
@@ -48,8 +49,11 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
 		return ctrl.Result{}, err
 	}
+	if err := qconfig.FetchSecretsFromReferences(ctx, r.Client, scalerConfig); err != nil {
+		return ctrl.Result{}, err
+	}
 
-	broker, err := brokers.NewBroker(ctx, r.Client, scalerConfig)
+	broker, err := brokers.NewBroker(scalerConfig)
 	if err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
 		return ctrl.Result{}, err

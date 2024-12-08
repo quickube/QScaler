@@ -3,6 +3,7 @@ package qconfig
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/quickube/QScaler/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
@@ -11,25 +12,34 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func UpdateConfigPasswordValue(ctx context.Context, client runtimeclient.Client, config *v1alpha1.ScalerConfig) error {
+func FetchSecretsFromReferences(ctx context.Context, client runtimeclient.Client, config *v1alpha1.ScalerConfig) error {
 	_ = log.FromContext(ctx)
 
-	if config.Spec.Config.Password.Value == "" {
-		secretRef := config.Spec.Config.Password.ValueFrom.SecretKeyRef
+	v := reflect.ValueOf(&config.Spec.Config).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		for x := 0; x < field.NumField(); x++ {
+			configField := field.Field(x)
+			if configField.Type() == reflect.TypeOf(v1alpha1.ValueOrSecret{}) {
+				valueOrSecret := configField.Interface().(v1alpha1.ValueOrSecret)
+				if valueOrSecret.Value == "" {
+					secretRef := valueOrSecret.ValueFrom.SecretKeyRef
+					actualSecret := &corev1.Secret{}
+					namespacedName := types.NamespacedName{Namespace: config.Namespace, Name: secretRef.Name}
+					if err := client.Get(ctx, namespacedName, actualSecret); err != nil {
+						return err
+					}
+					secretData, exists := actualSecret.Data[secretRef.Key]
+					if !exists {
+						return fmt.Errorf("key not found in secret:  %s.%s", secretRef.Name, secretRef.Key)
+					}
 
-		passwordSecret := &corev1.Secret{}
+					valueOrSecret.Value = string(secretData)
+					configField.Set(reflect.ValueOf(valueOrSecret))
+				}
+			}
 
-		namespacedName := types.NamespacedName{Namespace: config.Namespace, Name: secretRef.Name}
-		if err := client.Get(ctx, namespacedName, passwordSecret); err != nil {
-			log.Log.Error(err, fmt.Sprintf("unable to fetch config %s", namespacedName))
-			return err
 		}
-		actualPassword, exists := passwordSecret.Data[secretRef.Key]
-		if !exists {
-			return fmt.Errorf("key %s not found in secret %s", secretRef.Key, secretRef.Name)
-		}
-
-		config.Spec.Config.Password.Value = string(actualPassword)
 	}
 	return nil
 }
