@@ -19,12 +19,13 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/quickube/QScaler/internal/qconfig"
-
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
-
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -44,13 +45,21 @@ type ScalerConfigReconciler struct {
 func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
+	log.Log.Info(fmt.Sprintf("got request for: %+v", req.NamespacedName))
+
 	scalerConfig := &v1alpha1.ScalerConfig{}
 	if err := r.Get(ctx, req.NamespacedName, scalerConfig); err != nil {
+		if errors.IsNotFound(err) {
+			log.Log.Info("ScaleConfig resource not found")
+			return ctrl.Result{}, nil
+		}
 		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 
-	if err := qconfig.FetchSecretsFromReferences(ctx, r.Client, scalerConfig); err != nil {
+	if err := r.fetchSecretsFromReferences(ctx, scalerConfig); err != nil {
+		// removing broker as config might have changed
+		brokers.RemoveBroker(scalerConfig.Namespace, scalerConfig.Name)
 		return ctrl.Result{Requeue: true}, err
 	}
 
@@ -80,6 +89,39 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	log.Log.Info("ScalerConfig reconciled", "name", req.NamespacedName)
 	return ctrl.Result{}, nil
+}
+
+func (r *ScalerConfigReconciler) fetchSecretsFromReferences(ctx context.Context, config *v1alpha1.ScalerConfig) error {
+	_ = log.FromContext(ctx)
+
+	v := reflect.ValueOf(&config.Spec.Config).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		for x := 0; x < field.NumField(); x++ {
+			configField := field.Field(x)
+			if configField.Type() == reflect.TypeOf(v1alpha1.ValueOrSecret{}) {
+				valueOrSecret := configField.Interface().(v1alpha1.ValueOrSecret)
+				if valueOrSecret.Value == "" {
+					secretRef := valueOrSecret.ValueFrom.SecretKeyRef
+					actualSecret := &corev1.Secret{}
+					namespacedName := types.NamespacedName{Namespace: config.Namespace, Name: secretRef.Name}
+					if err := r.Get(ctx, namespacedName, actualSecret); err != nil {
+						return err
+					}
+
+					secretData, exists := actualSecret.Data[secretRef.Key]
+					if !exists {
+						return fmt.Errorf("key not found in secret:  %s.%s", secretRef.Name, secretRef.Key)
+					}
+
+					valueOrSecret.Value = string(secretData)
+					configField.Set(reflect.ValueOf(valueOrSecret))
+				}
+			}
+
+		}
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

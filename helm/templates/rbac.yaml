@@ -10,23 +10,10 @@ rules:
   - ""
   resources:
   - pods
-  - secrets
   verbs:
   - create
   - get
   - list
-  - watch
-- apiGroups:
-  - quickube.com
-  resources:
-  - qworkers
-  - scalerconfigs
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - ""
@@ -42,8 +29,11 @@ rules:
   - qworkers
   - scalerconfigs
   verbs:
+  - create
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - quickube.com
