@@ -48,6 +48,10 @@ endif
 init-qscaler: init-kind local-build
 	sh ./hack/init-qscaler.sh
 
+.PHONY: init-redis
+init-redis: init-kind
+	sh ./hack/init-redis.sh
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
 	$(GOLANGCI_LINT) run

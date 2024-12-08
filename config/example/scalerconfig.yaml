@@ -2,7 +2,8 @@ apiVersion: quickube.com/v1alpha1
 kind: ScalerConfig
 metadata:
   name: redis-config
-type: redis
+type:
+secretRefs:
 spec:
   host: redis-master.default.svc.cluster.local
   port: "6379"
