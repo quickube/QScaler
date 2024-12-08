@@ -3,11 +3,10 @@ package qconfig
 import (
 	"context"
 	"fmt"
-	"reflect"
-
 	"github.com/quickube/QScaler/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )

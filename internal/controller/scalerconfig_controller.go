@@ -49,6 +49,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
 		return ctrl.Result{}, err
 	}
+
 	if err := qconfig.FetchSecretsFromReferences(ctx, r.Client, scalerConfig); err != nil {
 		return ctrl.Result{Requeue: true}, err
 	}

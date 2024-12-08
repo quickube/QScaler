@@ -20,7 +20,7 @@ func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
 			Port:     config.Spec.Config.Port,
 			Password: config.Spec.Config.Password.Value,
 		}
-		redisClient, err := getBroker(config, func() (Broker, error) {
+		redisClient, err := createBroker(config, func() (Broker, error) {
 			return NewRedisClient(redisConfig)
 		})
 		if err != nil {
@@ -36,7 +36,7 @@ func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
 	}
 }
 
-func getBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error)) (Broker, error) {
+func createBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error)) (Broker, error) {
 	configKey := fmt.Sprintf("%s/%s", config.Namespace, config.Name)
 	// Ensure thread-safe access to the registry
 	RegistryMutex.Lock()
@@ -56,4 +56,15 @@ func getBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error))
 	// Store the broker in the registry
 	BrokerRegistry[configKey] = broker
 	return broker, nil
+}
+
+func GetBroker(namespace string, name string) (Broker, error) {
+	configKey := fmt.Sprintf("%s/%s", namespace, name)
+
+	RegistryMutex.Lock()
+	defer RegistryMutex.Unlock()
+	if broker, exists := BrokerRegistry[configKey]; exists {
+		return broker, nil
+	}
+	return nil, fmt.Errorf("broker not found for %s", configKey)
 }
