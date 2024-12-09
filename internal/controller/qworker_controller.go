@@ -19,17 +19,16 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -64,62 +63,33 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	// Fetch the ScalerConfig referenced in the QWorker
-	var scalerConfig v1alpha1.ScalerConfig
-	namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
-	if err := r.Get(ctx, namespacedName, &scalerConfig); err != nil {
-		log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
-		return ctrl.Result{}, err
-	}
-
-	BrokerClient, err := brokers.NewBroker(&scalerConfig)
-	if err != nil {
-		log.Log.Error(err, "Failed to create broker client")
-		return ctrl.Result{}, err
-	}
-
-	QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
-	if err != nil {
-		log.Log.Error(err, "Failed to get queue length")
-		return ctrl.Result{}, err
-	}
-	log.Log.Info(fmt.Sprintf("current queue length: %d", QueueLength))
-
-	desiredPodsAmount := min(
-		max(QueueLength*qworker.Spec.ScaleConfig.ScalingFactor, qworker.Spec.ScaleConfig.MinReplicas),
-		qworker.Spec.ScaleConfig.MaxReplicas)
-	log.Log.Info(fmt.Sprintf("desired amount: %d", desiredPodsAmount))
-	qworker.Status.DesiredReplicas = desiredPodsAmount
-
 	diffAmount := qworker.Status.DesiredReplicas - qworker.Status.CurrentReplicas
 	log.Log.Info(fmt.Sprintf("going to deploy / takedown: %d pods", diffAmount))
 
 	if diffAmount > 0 {
-		for _ = range diffAmount {
+		for range diffAmount {
 			if err := r.StartWorker(&ctx, qworker); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else if diffAmount < 0 {
-		for _ = range diffAmount * -1 {
+		for range diffAmount * -1 {
 			if err := r.RemoveWorker(&ctx, qworker); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	}
-
 	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %d", qworker.Name, qworker.Status.CurrentReplicas))
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.QWorker) error {
 	log.Log.Info("Starting worker", "name", qWorker.Name)
 	podId := fmt.Sprintf("%s-%s", qWorker.ObjectMeta.Name, uuid.New().String())
 	workerPod := &corev1.Pod{
-
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podId,
 			Namespace: qWorker.ObjectMeta.Namespace,
