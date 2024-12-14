@@ -100,7 +100,7 @@ func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.R
 			return ctrl.Result{}, nil
 		}
 		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 
 	if err := r.fetchSecretsFromReferences(ctx, scalerConfig); err != nil {
