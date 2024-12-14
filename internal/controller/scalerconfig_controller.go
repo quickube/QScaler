@@ -55,7 +55,10 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	maybeScaleConfig := &v1alpha1.ScalerConfig{}
 	if err := r.Get(ctx, req.NamespacedName, maybeScaleConfig); err != nil {
 		if errors.IsNotFound(err) {
-			return r.reconcileSecret(ctx, req)
+			log.Log.Info(fmt.Sprintf("checking secret reconcile request for: %+v", req.NamespacedName))
+			if _, ok := qconfig.SecretToQConfigsRegistry[req.Name]; ok {
+				return r.reconcileSecret(ctx, req)
+			}
 		}
 		return ctrl.Result{}, err
 	}
@@ -104,7 +107,10 @@ func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.R
 		log.Log.Error(err, fmt.Sprintf("Failed to fetch secrets for: %+v", req.NamespacedName))
 		// removing broker as config might have changed
 		brokers.RemoveBroker(scalerConfig.Namespace, scalerConfig.Name)
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
+		return ctrl.Result{}, err
+	}
+	if err := r.Update(ctx, scalerConfig); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	broker, err := brokers.NewBroker(scalerConfig)
@@ -152,7 +158,6 @@ func (r *ScalerConfigReconciler) fetchSecretsFromReferences(ctx context.Context,
 					if err := r.Get(ctx, namespacedName, actualSecret); err != nil {
 						return err
 					}
-
 					qconfig.AddSecret(config.Name, actualSecret.Name)
 
 					secretData, exists := actualSecret.Data[secretRef.Key]
