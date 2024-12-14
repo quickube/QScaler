@@ -73,6 +73,7 @@ func RemoveBroker(namespace string, name string) {
 	configKey := fmt.Sprintf("%s/%s", namespace, name)
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()
+
 	if _, exists := BrokerRegistry[configKey]; exists {
 		delete(BrokerRegistry, configKey)
 	}

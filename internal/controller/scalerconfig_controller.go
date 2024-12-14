@@ -21,14 +21,19 @@ import (
 	"fmt"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
+	"github.com/quickube/QScaler/internal/qconfig"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"time"
 )
 
 // ScalerConfigReconciler reconciles a ScalerConfig object
@@ -40,12 +45,50 @@ type ScalerConfigReconciler struct {
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/finalizers,verbs=update
-// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;update;patch
 
 func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
 	log.Log.Info(fmt.Sprintf("got request for: %+v", req.NamespacedName))
+
+	maybeScaleConfig := &v1alpha1.ScalerConfig{}
+	if err := r.Get(ctx, req.NamespacedName, maybeScaleConfig); err != nil {
+		if errors.IsNotFound(err) {
+			return r.reconcileSecret(ctx, req)
+		}
+		return ctrl.Result{}, err
+	}
+	return r.reconcileScaler(ctx, req)
+}
+
+func (r *ScalerConfigReconciler) reconcileSecret(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	_ = log.FromContext(ctx)
+	log.Log.Info(fmt.Sprintf("reconcileing secret: %s", req.Name))
+
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, req.NamespacedName, secret); err != nil {
+		if errors.IsNotFound(err) {
+			log.Log.Info("secret not found / deleted, this should be handled in a finalizer")
+		} else {
+			log.Log.Error(err, fmt.Sprintf("unable to fetch secret used by scaleConfig %s", req.NamespacedName))
+		}
+		qconfig.RemoveSecret(secret.Name)
+		return ctrl.Result{}, err
+	}
+
+	for _, configName := range qconfig.SecretToQConfigsRegistry[req.Name] {
+		namespacedName := types.NamespacedName{Namespace: req.Namespace, Name: configName}
+		if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName}); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	_ = log.FromContext(ctx)
+	log.Log.Info(fmt.Sprintf("reconcileing Scaler: %s", req.Name))
 
 	scalerConfig := &v1alpha1.ScalerConfig{}
 	if err := r.Get(ctx, req.NamespacedName, scalerConfig); err != nil {
@@ -58,9 +101,10 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if err := r.fetchSecretsFromReferences(ctx, scalerConfig); err != nil {
+		log.Log.Error(err, fmt.Sprintf("Failed to fetch secrets for: %+v", req.NamespacedName))
 		// removing broker as config might have changed
 		brokers.RemoveBroker(scalerConfig.Namespace, scalerConfig.Name)
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
 	broker, err := brokers.NewBroker(scalerConfig)
@@ -88,7 +132,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	log.Log.Info("ScalerConfig reconciled", "name", req.NamespacedName)
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
 func (r *ScalerConfigReconciler) fetchSecretsFromReferences(ctx context.Context, config *v1alpha1.ScalerConfig) error {
@@ -109,6 +153,8 @@ func (r *ScalerConfigReconciler) fetchSecretsFromReferences(ctx context.Context,
 						return err
 					}
 
+					qconfig.AddSecret(config.Name, actualSecret.Name)
+
 					secretData, exists := actualSecret.Data[secretRef.Key]
 					if !exists {
 						return fmt.Errorf("key not found in secret:  %s.%s", secretRef.Name, secretRef.Key)
@@ -118,16 +164,24 @@ func (r *ScalerConfigReconciler) fetchSecretsFromReferences(ctx context.Context,
 					configField.Set(reflect.ValueOf(valueOrSecret))
 				}
 			}
-
 		}
 	}
 	return nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	annotationPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		name := obj.GetName()
+		if _, ok := qconfig.SecretToQConfigsRegistry[name]; ok {
+			return true
+		}
+		return false
+	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.ScalerConfig{}).
-		Named("scalerconfig").
+		Watches(
+			&corev1.Secret{},
+			&handler.EnqueueRequestForObject{},
+			builder.WithPredicates(annotationPredicate)).
 		Complete(r)
 }
