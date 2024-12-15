@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/quickube/QScaler/api/v1alpha1"
@@ -27,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 var _ = Describe("QWorker Controller", func() {
@@ -109,8 +110,9 @@ var _ = Describe("QWorker Controller", func() {
 		})
 
 		It("should reconcile successfully and update QWorker status", func() {
-			BrokerMock.On("GetQueueLength", mock.Anything, mock.Anything).Return(5, nil).Once()
-			BrokerMock.On("IsConnected", mock.Anything).Return(true, nil).Once()
+			By("Setting broker mocks")
+			BrokerMock.On("GetQueueLength", mock.Anything, mock.Anything).Return(5, nil)
+			BrokerMock.On("IsConnected", mock.Anything).Return(true, nil)
 
 			time.Sleep(5 * time.Second)
 			By("Checking QWorker status")
@@ -121,68 +123,43 @@ var _ = Describe("QWorker Controller", func() {
 
 		})
 
-		//It("should handle missing ScalerConfig gracefully", func() {
-		//	By("Deleting the ScalerConfig resource")
-		//	Expect(k8sClient.Delete(ctx, scalerConfigResource)).To(Succeed())
-		//
-		//	By("Reconciling the QWorker resource")
-		//	_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: qworkerNamespaced})
-		//	Expect(err).To(HaveOccurred())
-		//})
+		It("should scale up pods when needed", func() {
+			By("Setting broker mocks")
+			BrokerMock.On("GetQueueLength", mock.Anything, mock.Anything).Return(5, nil)
+			BrokerMock.On("IsConnected", mock.Anything).Return(true, nil)
+			time.Sleep(5 * time.Second)
 
-		//It("should scale up pods when needed", func() {
-		//	By("Setting up a scenario where scaling up is required")
-		//	qworkerResource.Status.CurrentReplicas = 1
-		//	Expect(k8sClient.Status().Update(ctx, qworkerResource)).To(Succeed())
-		//
-		//	By("Reconciling the QWorker resource")
-		//	_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: qworkerNamespaced})
-		//	Expect(err).NotTo(HaveOccurred())
-		//
-		//	By("Retrieving all Pods in the namespace")
-		//	podList := &corev1.PodList{}
-		//	Expect(k8sClient.List(ctx, podList, ctrlclient.InNamespace(namespace))).To(Succeed())
-		//
-		//	By("Filtering Pods by owner reference")
-		//	ownedPods := []corev1.Pod{}
-		//	for _, pod := range podList.Items {
-		//		for _, ownerRef := range pod.OwnerReferences {
-		//			if ownerRef.Name == resourceName && ownerRef.Kind == "QWorker" {
-		//				ownedPods = append(ownedPods, pod)
-		//			}
-		//		}
-		//	}
-		//
-		//	By("Verifying the number of Pods matches the desired replicas")
-		//	Expect(len(ownedPods)).To(Equal(qworkerResource.Status.DesiredReplicas))
-		//})
+			By("Retrieving all Pods in the namespace")
+			podList := &corev1.PodList{}
+			Expect(k8sClient.List(ctx, podList, ctrlclient.InNamespace(namespace))).To(Succeed())
 
-		//It("should scale down pods when needed", func() {
-		//	By("Setting up a scenario where scaling down is required")
-		//	qworkerResource.Status.CurrentReplicas = 5
-		//	Expect(k8sClient.Status().Update(ctx, qworkerResource)).To(Succeed())
-		//
-		//	By("Reconciling the QWorker resource")
-		//	_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: qworkerNamespaced})
-		//	Expect(err).NotTo(HaveOccurred())
-		//
-		//	By("Retrieving all Pods in the namespace")
-		//	podList := &corev1.PodList{}
-		//	Expect(k8sClient.List(ctx, podList, ctrlclient.InNamespace(namespace))).To(Succeed())
-		//
-		//	By("Filtering Pods by owner reference")
-		//	ownedPods := []corev1.Pod{}
-		//	for _, pod := range podList.Items {
-		//		for _, ownerRef := range pod.OwnerReferences {
-		//			if ownerRef.Name == resourceName && ownerRef.Kind == "QWorker" {
-		//				ownedPods = append(ownedPods, pod)
-		//			}
-		//		}
-		//	}
-		//
-		//	By("Verifying the number of Pods matches the desired replicas")
-		//	Expect(len(ownedPods)).To(Equal(qworkerResource.Status.DesiredReplicas))
-		//})
+			By("Filtering Pods by owner reference")
+			ownedPods := []corev1.Pod{}
+			for _, pod := range podList.Items {
+				for _, ownerRef := range pod.OwnerReferences {
+					if ownerRef.Name == resourceName {
+						ownedPods = append(ownedPods, pod)
+					}
+				}
+			}
+
+			By("Deleting all Pods")
+			for _, pod := range ownedPods {
+				// Create delete options with GracePeriodSeconds set to 0
+				deleteOptions := &ctrlclient.DeleteOptions{
+					GracePeriodSeconds: new(int64), // A pointer to 0
+				}
+				*deleteOptions.GracePeriodSeconds = 0
+
+				Expect(k8sClient.Delete(ctx, &pod, deleteOptions)).To(Succeed())
+			}
+
+			time.Sleep(5 * time.Second)
+
+			By("Verifying the number of Pods matches the desired replicas")
+			Expect(k8sClient.Get(ctx, ctrlclient.ObjectKeyFromObject(qworkerResource), qworkerResource)).To(Succeed())
+			Expect(ownedPods).To(HaveLen(qworkerResource.Status.DesiredReplicas))
+		})
 
 	})
 })
