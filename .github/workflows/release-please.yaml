@@ -16,6 +16,5 @@ jobs:
       - uses: googleapis/release-please-action@v4
         with:
           release-type: helm
-          package-name: qscaler
-          path: helm
+          path: helm/
           token: ${{ secrets.GIT_TOKEN }}
