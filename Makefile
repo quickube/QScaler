@@ -84,6 +84,7 @@ $(LOCALBIN):
 KUBECTL ?= kubectl
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
+ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
 CONTROLLER_TOOLS_VERSION ?= v0.16.4
@@ -99,6 +100,11 @@ golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
 $(GOLANGCI_LINT): $(LOCALBIN)
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
+.PHONY: envtest
+envtest: $(ENVTEST) ## Install envtest-setup from vendor dir if necessary.
+$(ENVTEST): $(LOCALBIN)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/tools/setup-envtest,$(CONTROLLER_TOOLS_VERSION))
+
 .PHONY: helm
 helm: manifests
 	helm lint ./helm
@@ -107,8 +113,9 @@ helm: manifests
 mocks:
 	mockery --all
 
+
 .PHONY: test
-test:
+test: envtest
 	go test -short ./internal/...
 
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
