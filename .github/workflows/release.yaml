@@ -1,0 +1,57 @@
+name: Release Workflow
+
+on:
+  release:
+    types:
+      - published
+      - edited
+
+jobs:
+  piper-image:
+    name: piper-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-buildx-action@v2
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: quickube/piper
+      - name: Build and export
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: quickube/piper:${{ github.ref_name }},latest
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  helm:
+    name: helm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+      - name: Install Helm Docs
+        uses: envoy/install-helm-docs@v1.0.0
+        with:
+          version: 1.11.0
+      - name: Helm lint and template
+        run: |
+          make helm
+      - name: Publish Helm chart
+        uses: stefanprodan/helm-gh-pages@master
+        with:
+          chart_version: ${{ github.ref_name }}
+          app_version: ${{ github.ref_name }}
+          token: ${{ secrets.GIT_TOKEN }}
+          charts_dir: .
