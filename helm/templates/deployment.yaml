@@ -24,7 +24,8 @@ spec:
         {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:secret corev1.Secret
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "qscaler.serviceAccountName" . }}
       securityContext:

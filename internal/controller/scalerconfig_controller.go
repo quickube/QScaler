@@ -51,15 +51,12 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	_ = log.FromContext(ctx)
 
 	log.Log.Info(fmt.Sprintf("got request for: %+v", req.NamespacedName))
+	if _, ok := qconfig.SecretToQConfigsRegistry[req.Name]; ok {
+		return r.reconcileSecret(ctx, req)
+	}
 
 	maybeScaleConfig := &v1alpha1.ScalerConfig{}
 	if err := r.Get(ctx, req.NamespacedName, maybeScaleConfig); err != nil {
-		if errors.IsNotFound(err) {
-			log.Log.Info(fmt.Sprintf("checking secret reconcile request for: %+v", req.NamespacedName))
-			if _, ok := qconfig.SecretToQConfigsRegistry[req.Name]; ok {
-				return r.reconcileSecret(ctx, req)
-			}
-		}
 		return ctrl.Result{}, err
 	}
 	return r.reconcileScaler(ctx, req)
