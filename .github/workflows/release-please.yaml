@@ -14,10 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - uses: googleapis/release-please-action@v4
+      - uses: google-github-actions/release-please-action@v4
+        id: release
         with:
-          release-type: helm
-          path: helm
+          release-type: go
+          package-name: qscaler
           token: ${{ secrets.GIT_TOKEN }}
