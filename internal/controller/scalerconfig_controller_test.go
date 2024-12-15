@@ -43,7 +43,7 @@ func TestFetchSecretsFromReferences(t *testing.T) {
 
 		config := globalConfig.DeepCopy()
 		config.Spec.Config = v1alpha1.ScalerTypeConfigs{
-			v1alpha1.RedisConfig{
+			RedisConfig: v1alpha1.RedisConfig{
 				Host: "host",
 				Port: "0",
 				Password: v1alpha1.ValueOrSecret{
@@ -58,7 +58,7 @@ func TestFetchSecretsFromReferences(t *testing.T) {
 			},
 		}
 		// Execute
-		err := controllerReconciler.fetchSecretsFromReferences(ctx, config)
+		err := controllerReconciler.loadSecretsFromReferences(ctx, config)
 
 		// Assert
 		assert.Error(t, err)
@@ -76,7 +76,7 @@ func TestFetchSecretsFromReferences(t *testing.T) {
 
 		config := globalConfig.DeepCopy()
 		config.Spec.Config = v1alpha1.ScalerTypeConfigs{
-			v1alpha1.RedisConfig{
+			RedisConfig: v1alpha1.RedisConfig{
 				Host: "host",
 				Port: "0",
 				Password: v1alpha1.ValueOrSecret{
@@ -91,7 +91,7 @@ func TestFetchSecretsFromReferences(t *testing.T) {
 			},
 		}
 		// Execute
-		err := controllerReconciler.fetchSecretsFromReferences(ctx, config)
+		err := controllerReconciler.loadSecretsFromReferences(ctx, config)
 
 		// Assert
 		assert.Error(t, err)
@@ -109,7 +109,7 @@ func TestFetchSecretsFromReferences(t *testing.T) {
 
 		config := globalConfig.DeepCopy()
 		config.Spec.Config = v1alpha1.ScalerTypeConfigs{
-			v1alpha1.RedisConfig{
+			RedisConfig: v1alpha1.RedisConfig{
 				Host: "host",
 				Port: "0",
 				Password: v1alpha1.ValueOrSecret{
@@ -124,7 +124,7 @@ func TestFetchSecretsFromReferences(t *testing.T) {
 			},
 		}
 		// Execute
-		err := controllerReconciler.fetchSecretsFromReferences(ctx, config)
+		err := controllerReconciler.loadSecretsFromReferences(ctx, config)
 
 		// Assert
 		assert.NoError(t, err)

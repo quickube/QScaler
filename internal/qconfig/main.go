@@ -20,7 +20,5 @@ func RemoveSecret(secretName string) {
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()
 
-	if _, ok := SecretToQConfigsRegistry[secretName]; ok {
-		delete(SecretToQConfigsRegistry, secretName)
-	}
+	delete(SecretToQConfigsRegistry, secretName)
 }

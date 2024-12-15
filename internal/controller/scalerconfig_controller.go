@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"time"
 )
 
 // ScalerConfigReconciler reconciles a ScalerConfig object
@@ -55,10 +54,6 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return r.reconcileSecret(ctx, req)
 	}
 
-	maybeScaleConfig := &v1alpha1.ScalerConfig{}
-	if err := r.Get(ctx, req.NamespacedName, maybeScaleConfig); err != nil {
-		return ctrl.Result{}, err
-	}
 	return r.reconcileScaler(ctx, req)
 }
 
@@ -92,25 +87,19 @@ func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.R
 
 	scalerConfig := &v1alpha1.ScalerConfig{}
 	if err := r.Get(ctx, req.NamespacedName, scalerConfig); err != nil {
-		if errors.IsNotFound(err) {
-			log.Log.Info("ScaleConfig resource not found")
-			return ctrl.Result{}, nil
-		}
 		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
 		return ctrl.Result{}, err
 	}
 
-	if err := r.fetchSecretsFromReferences(ctx, scalerConfig); err != nil {
+	secretScaleConfig := scalerConfig.DeepCopy()
+	if err := r.loadSecretsFromReferences(ctx, secretScaleConfig); err != nil {
 		log.Log.Error(err, fmt.Sprintf("Failed to fetch secrets for: %+v", req.NamespacedName))
 		// removing broker as config might have changed
-		brokers.RemoveBroker(scalerConfig.Namespace, scalerConfig.Name)
-		return ctrl.Result{}, err
-	}
-	if err := r.Update(ctx, scalerConfig); err != nil {
+		brokers.RemoveBroker(secretScaleConfig.Namespace, secretScaleConfig.Name)
 		return ctrl.Result{}, err
 	}
 
-	broker, err := brokers.NewBroker(scalerConfig)
+	broker, err := brokers.NewBroker(secretScaleConfig)
 	if err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
 		return ctrl.Result{}, err
@@ -126,6 +115,7 @@ func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.R
 		}
 		return ctrl.Result{}, err
 	} else {
+
 		scalerConfig.Status.Healthy = true
 		scalerConfig.Status.Message = "Connected to broker"
 		if err = r.Status().Update(ctx, scalerConfig); err != nil {
@@ -135,10 +125,10 @@ func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.R
 	}
 
 	log.Log.Info("ScalerConfig reconciled", "name", req.NamespacedName)
-	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	return ctrl.Result{}, nil
 }
 
-func (r *ScalerConfigReconciler) fetchSecretsFromReferences(ctx context.Context, config *v1alpha1.ScalerConfig) error {
+func (r *ScalerConfigReconciler) loadSecretsFromReferences(ctx context.Context, config *v1alpha1.ScalerConfig) error {
 	_ = log.FromContext(ctx)
 
 	v := reflect.ValueOf(&config.Spec.Config).Elem()

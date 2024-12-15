@@ -74,7 +74,5 @@ func RemoveBroker(namespace string, name string) {
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()
 
-	if _, exists := BrokerRegistry[configKey]; exists {
-		delete(BrokerRegistry, configKey)
-	}
+	delete(BrokerRegistry, configKey)
 }
