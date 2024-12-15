@@ -19,17 +19,17 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -49,19 +49,19 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	qworker := &v1alpha1.QWorker{}
 	if err := r.Get(ctx, req.NamespacedName, qworker); err != nil {
 		log.Log.Error(err, "unable to fetch QWorker")
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	var podList corev1.PodList
 	if err := r.List(ctx, &podList, client.InNamespace(req.Namespace), client.MatchingFields{"metadata.ownerReferences.name": qworker.Name}); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 	currentPodCount := len(podList.Items)
 	qworker.Status.CurrentReplicas = currentPodCount
 
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		log.Log.Error(err, fmt.Sprintf("Failed to update QWorker status %s", qworker.Name))
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	// Fetch the ScalerConfig referenced in the QWorker
@@ -69,41 +69,44 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
 	if err := r.Get(ctx, namespacedName, &scalerConfig); err != nil {
 		log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	BrokerClient, err := brokers.NewBroker(&scalerConfig)
 	if err != nil {
 		log.Log.Error(err, "Failed to create broker client")
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
 	if err != nil {
 		log.Log.Error(err, "Failed to get queue length")
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 	log.Log.Info(fmt.Sprintf("current queue length: %d", QueueLength))
 
 	desiredPodsAmount := min(
 		max(QueueLength*qworker.Spec.ScaleConfig.ScalingFactor, qworker.Spec.ScaleConfig.MinReplicas),
 		qworker.Spec.ScaleConfig.MaxReplicas)
-	log.Log.Info(fmt.Sprintf("desired amount: %d", desiredPodsAmount))
+	log.Log.Info(fmt.Sprintf("QWorker %s desired amount: %d", qworker.Name, desiredPodsAmount))
 	qworker.Status.DesiredReplicas = desiredPodsAmount
 
 	diffAmount := qworker.Status.DesiredReplicas - qworker.Status.CurrentReplicas
-	log.Log.Info(fmt.Sprintf("going to deploy / takedown: %d pods", diffAmount))
+	if diffAmount != 0 {
+		log.Log.Info(fmt.Sprintf("scaling horizontally %s from %d to %d", qworker.Name, qworker.Status.CurrentReplicas, qworker.Status.DesiredReplicas))
 
-	if diffAmount > 0 {
-		for _ = range diffAmount {
-			if err := r.StartWorker(&ctx, qworker); err != nil {
-				return ctrl.Result{}, err
+		if diffAmount > 0 {
+			for range diffAmount {
+				if err := r.StartWorker(&ctx, qworker); err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
 			}
-		}
-	} else if diffAmount < 0 {
-		for _ = range diffAmount * -1 {
-			if err := r.RemoveWorker(&ctx, qworker); err != nil {
-				return ctrl.Result{}, err
+
+		} else if diffAmount < 0 {
+			for range diffAmount * -1 {
+				if err := r.RemoveWorker(&ctx, qworker); err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
 			}
 		}
 	}
@@ -112,7 +115,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		return ctrl.Result{}, err
 	}
-	return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	return ctrl.Result{}, nil
 }
 
 func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.QWorker) error {
@@ -181,6 +184,14 @@ func (r *QWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.QWorker{}).
-		Named("qworker").
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestForOwner(
+				mgr.GetScheme(),
+				mgr.GetRESTMapper(),
+				&v1alpha1.QWorker{},
+				handler.OnlyControllerOwner(), // Ensure we only enqueue for Pods controlled by QWorker
+			),
+		).
 		Complete(r)
 }

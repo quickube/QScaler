@@ -23,6 +23,10 @@ func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
 		}
 		return redisClient, nil
 	default:
+		// Check if the broker already exists
+		if broker, exists := BrokerRegistry[config.Type]; exists {
+			return broker, nil
+		}
 		return nil, fmt.Errorf("unsupported broker type: %s", config.Type)
 	}
 }
