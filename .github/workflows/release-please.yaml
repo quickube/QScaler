@@ -13,8 +13,11 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - uses: googleapis/release-please-action@v4
         with:
           release-type: helm
-          path: helm/
+          path: helm
           token: ${{ secrets.GIT_TOKEN }}
