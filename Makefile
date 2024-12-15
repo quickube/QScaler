@@ -104,6 +104,13 @@ helm: manifests
 	helm lint ./helm
 	helm template ./helm --debug > _lint.yaml
 
+mocks:
+	mockery --all
+
+.PHONY: test
+test:
+	go test -short ./internal/...
+
 # go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
 # $1 - target path with name of binary
 # $2 - package url which can be installed

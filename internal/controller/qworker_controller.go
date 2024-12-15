@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
@@ -95,14 +96,14 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Log.Info(fmt.Sprintf("scaling horizontally %s from %d to %d", qworker.Name, qworker.Status.CurrentReplicas, qworker.Status.DesiredReplicas))
 
 		if diffAmount > 0 {
-			for _ = range diffAmount {
+			for range diffAmount {
 				if err := r.StartWorker(&ctx, qworker); err != nil {
 					return ctrl.Result{Requeue: true}, err
 				}
 			}
 
 		} else if diffAmount < 0 {
-			for _ = range diffAmount * -1 {
+			for range diffAmount * -1 {
 				if err := r.RemoveWorker(&ctx, qworker); err != nil {
 					return ctrl.Result{Requeue: true}, err
 				}
@@ -181,16 +182,13 @@ func (r *QWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	scheme := mgr.GetScheme()
-	mapper := mgr.GetRESTMapper()
-
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.QWorker{}).
 		Watches(
 			&corev1.Pod{},
 			handler.EnqueueRequestForOwner(
-				scheme,
-				mapper,
+				mgr.GetScheme(),
+				mgr.GetRESTMapper(),
 				&v1alpha1.QWorker{},
 				handler.OnlyControllerOwner(), // Ensure we only enqueue for Pods controlled by QWorker
 			),
