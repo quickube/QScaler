@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -42,18 +43,19 @@ type QWorkerReconciler struct {
 // +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 
 func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	qworker := &v1alpha1.QWorker{}
 	if err := r.Get(ctx, req.NamespacedName, qworker); err != nil {
 		log.Log.Error(err, "unable to fetch QWorker")
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	var podList corev1.PodList
 	if err := r.List(ctx, &podList, client.InNamespace(req.Namespace), client.MatchingFields{"metadata.ownerReferences.name": qworker.Name}); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{Requeue: true}, err
 	}
 	currentPodCount := len(podList.Items)
 	qworker.Status.CurrentReplicas = currentPodCount
@@ -66,19 +68,22 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	diffAmount := qworker.Status.DesiredReplicas - qworker.Status.CurrentReplicas
 	log.Log.Info(fmt.Sprintf("going to deploy / takedown: %d pods", diffAmount))
 
-	if diffAmount > 0 {
-		for range diffAmount {
-			if err := r.StartWorker(&ctx, qworker); err != nil {
-				return ctrl.Result{}, err
+		if diffAmount > 0 {
+			for range diffAmount {
+				if err := r.StartWorker(&ctx, qworker); err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
+			}
+
+		} else if diffAmount < 0 {
+			for range diffAmount * -1 {
+				if err := r.RemoveWorker(&ctx, qworker); err != nil {
+					return ctrl.Result{Requeue: true}, err
+				}
 			}
 		}
-	} else if diffAmount < 0 {
-		for range diffAmount * -1 {
-			if err := r.RemoveWorker(&ctx, qworker); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-	}
+
+
 	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %d", qworker.Name, qworker.Status.CurrentReplicas))
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		return ctrl.Result{}, err
@@ -90,6 +95,7 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 	log.Log.Info("Starting worker", "name", qWorker.Name)
 	podId := fmt.Sprintf("%s-%s", qWorker.ObjectMeta.Name, uuid.New().String())
 	workerPod := &corev1.Pod{
+
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podId,
 			Namespace: qWorker.ObjectMeta.Namespace,
@@ -111,16 +117,9 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 }
 func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1.QWorker) error {
 
-	var scalerConfig v1alpha1.ScalerConfig
-	namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
-	if err := r.Get(*ctx, namespacedName, &scalerConfig); err != nil {
-		log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
-		return err
-	}
-
-	BrokerClient, err := brokers.NewBroker(&scalerConfig)
+	BrokerClient, err := brokers.GetBroker(qworker.ObjectMeta.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
 	if err != nil {
-		log.Log.Error(err, "Failed to create broker client")
+		log.Log.Error(err, "Failed to get broker client")
 		return err
 	}
 
@@ -151,6 +150,14 @@ func (r *QWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.QWorker{}).
-		Named("qworker").
+		Watches(
+			&corev1.Pod{},
+			handler.EnqueueRequestForOwner(
+				mgr.GetScheme(),
+				mgr.GetRESTMapper(),
+				&v1alpha1.QWorker{},
+				handler.OnlyControllerOwner(), // Ensure we only enqueue for Pods controlled by QWorker
+			),
+		).
 		Complete(r)
 }

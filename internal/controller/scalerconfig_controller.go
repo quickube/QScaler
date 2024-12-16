@@ -19,14 +19,19 @@ package controller
 import (
 	"context"
 	"fmt"
-
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
-
+	"github.com/quickube/QScaler/internal/qconfig"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // ScalerConfigReconciler reconciles a ScalerConfig object
@@ -38,18 +43,45 @@ type ScalerConfigReconciler struct {
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;update;patch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ScalerConfig object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.1/pkg/reconcile
 func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+
+	log.Log.Info(fmt.Sprintf("got request for: %+v", req.NamespacedName))
+	if len(qconfig.ListQConfigs(req.Name)) != 0 {
+		return r.reconcileSecret(ctx, req)
+	}
+
+	return r.reconcileScaler(ctx, req)
+}
+
+func (r *ScalerConfigReconciler) reconcileSecret(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	_ = log.FromContext(ctx)
+	log.Log.Info(fmt.Sprintf("reconcileing secret: %s", req.Name))
+	var qConfigs []string
+
+	secret := &corev1.Secret{}
+	if err := r.Get(ctx, req.NamespacedName, secret); err != nil {
+		log.Log.Error(err, fmt.Sprintf("unable to fetch secret used by scaleConfig %s", req.NamespacedName))
+		qConfigs = qconfig.PopSecret(secret.Name)
+		return ctrl.Result{}, err
+	} else {
+		qConfigs = qconfig.ListQConfigs(secret.Name)
+	}
+
+	for _, configName := range qConfigs {
+		namespacedName := types.NamespacedName{Namespace: req.Namespace, Name: configName}
+		if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName}); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+	return ctrl.Result{}, nil
+}
+
+func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	_ = log.FromContext(ctx)
+	log.Log.Info(fmt.Sprintf("reconcileing Scaler: %s", req.Name))
 
 	scalerConfig := &v1alpha1.ScalerConfig{}
 	if err := r.Get(ctx, req.NamespacedName, scalerConfig); err != nil {
@@ -57,7 +89,15 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, err
 	}
 
-	broker, err := brokers.NewBroker(scalerConfig)
+	secretScaleConfig := scalerConfig.DeepCopy()
+	if err := r.loadSecretsFromReferences(ctx, secretScaleConfig); err != nil {
+		log.Log.Error(err, fmt.Sprintf("Failed to fetch secrets for: %+v", req.NamespacedName))
+		// removing broker as config might have changed
+		brokers.RemoveBroker(secretScaleConfig.Namespace, secretScaleConfig.Name)
+		return ctrl.Result{}, err
+	}
+	//TODO: what happens if secret is updated
+	broker, err := brokers.NewBroker(secretScaleConfig)
 	if err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
 		return ctrl.Result{}, err
@@ -73,6 +113,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 		return ctrl.Result{}, err
 	} else {
+
 		scalerConfig.Status.Healthy = true
 		scalerConfig.Status.Message = "Connected to broker"
 		if err = r.Status().Update(ctx, scalerConfig); err != nil {
@@ -85,10 +126,50 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
+func (r *ScalerConfigReconciler) loadSecretsFromReferences(ctx context.Context, config *v1alpha1.ScalerConfig) error {
+	_ = log.FromContext(ctx)
+
+	v := reflect.ValueOf(&config.Spec.Config).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		for x := 0; x < field.NumField(); x++ {
+			configField := field.Field(x)
+			if configField.Type() == reflect.TypeOf(v1alpha1.ValueOrSecret{}) {
+				valueOrSecret := configField.Interface().(v1alpha1.ValueOrSecret)
+				if valueOrSecret.Value == "" {
+					secretRef := valueOrSecret.ValueFrom.SecretKeyRef
+					actualSecret := &corev1.Secret{}
+					namespacedName := types.NamespacedName{Namespace: config.Namespace, Name: secretRef.Name}
+					if err := r.Get(ctx, namespacedName, actualSecret); err != nil {
+						return err
+					}
+					log.Log.Info(fmt.Sprintf("adding secret to watch: %s", actualSecret.Name))
+					qconfig.AddSecret(config.Name, actualSecret.Name)
+
+					secretData, exists := actualSecret.Data[secretRef.Key]
+					if !exists {
+						return fmt.Errorf("key not found in secret:  %s.%s", secretRef.Name, secretRef.Key)
+					}
+
+					valueOrSecret.Value = string(secretData)
+					configField.Set(reflect.ValueOf(valueOrSecret))
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	annotationPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		name := obj.GetName()
+		return len(qconfig.ListQConfigs(name)) != 0
+	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.ScalerConfig{}).
-		Named("scalerconfig").
+		Watches(
+			&corev1.Secret{},
+			&handler.EnqueueRequestForObject{},
+			builder.WithPredicates(annotationPredicate)).
 		Complete(r)
 }

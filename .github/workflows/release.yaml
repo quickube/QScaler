@@ -1,0 +1,53 @@
+name: Release Workflow
+
+on:
+  release:
+    types:
+      - published
+      - edited
+
+jobs:
+  piper-image:
+    name: qscaler-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: quickube/qscaler
+      - name: Build and export
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: quickube/qscaler:${{ github.ref_name }},latest
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  helm:
+    name: helm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm
+        uses: azure/setup-helm@v4.2.0
+      - name: Helm lint and template
+        run: |
+          make helm
+      - name: Publish Helm chart
+        uses: stefanprodan/helm-gh-pages@master
+        with:
+          chart_version: ${{ github.ref_name }}
+          app_version: ${{ github.ref_name }}
+          token: ${{ secrets.GIT_TOKEN }}
+          charts_dir: helm
