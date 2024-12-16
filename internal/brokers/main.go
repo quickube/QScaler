@@ -13,34 +13,27 @@ var (
 )
 
 func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
-	switch config.Type {
+	switch config.Spec.Type {
 	case "redis":
-		redisClient, err := getBroker(config, func() (Broker, error) {
-			return NewRedisClient(config)
-		})
+		redisClient, err := createBroker(config, func() (Broker, error) { return NewRedisClient(config) })
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize Redis broker: %w", err)
 		}
 		return redisClient, nil
 	default:
 		// Check if the broker already exists
-		if broker, exists := BrokerRegistry[config.Type]; exists {
+		if broker, exists := BrokerRegistry[config.Spec.Type]; exists {
 			return broker, nil
 		}
-		return nil, fmt.Errorf("unsupported broker type: %s", config.Type)
+		return nil, fmt.Errorf("unsupported broker type: %s", config.Spec.Type)
 	}
 }
 
-func getBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error)) (Broker, error) {
+func createBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error)) (Broker, error) {
 	configKey := fmt.Sprintf("%s/%s", config.Namespace, config.Name)
 	// Ensure thread-safe access to the registry
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()
-
-	// Check if the broker already exists
-	if broker, exists := BrokerRegistry[configKey]; exists {
-		return broker, nil
-	}
 
 	// Create a new broker if it doesn't exist
 	broker, err := createFunc()
@@ -51,4 +44,23 @@ func getBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error))
 	// Store the broker in the registry
 	BrokerRegistry[configKey] = broker
 	return broker, nil
+}
+
+func GetBroker(namespace string, name string) (Broker, error) {
+	configKey := fmt.Sprintf("%s/%s", namespace, name)
+
+	RegistryMutex.Lock()
+	defer RegistryMutex.Unlock()
+	if broker, exists := BrokerRegistry[configKey]; exists {
+		return broker, nil
+	}
+	return nil, fmt.Errorf("broker not found for %s", configKey)
+}
+
+func RemoveBroker(namespace string, name string) {
+	configKey := fmt.Sprintf("%s/%s", namespace, name)
+	RegistryMutex.Lock()
+	defer RegistryMutex.Unlock()
+
+	delete(BrokerRegistry, configKey)
 }
