@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -50,9 +51,9 @@ var _ = Describe("QWorker Controller", func() {
 					Name:      scalerConfigName,
 					Namespace: namespace,
 				},
-				Type: "test",
-				Spec: map[string]string{
-					"key": "value",
+				Spec: v1alpha1.ScalerConfigSpec{
+					Type:   "test",
+					Config: v1alpha1.ScalerTypeConfigs{},
 				},
 				Status: v1alpha1.ScalerConfigStatus{
 					Healthy: true,
@@ -99,7 +100,8 @@ var _ = Describe("QWorker Controller", func() {
 			Expect(err).NotTo(HaveOccurred(), "Failed to fetch test QWorker resource")
 
 			BrokerMock = &mocks.Broker{}
-			brokers.BrokerRegistry["test"] = BrokerMock
+			configKey := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
+			brokers.BrokerRegistry[configKey] = BrokerMock
 
 		})
 
