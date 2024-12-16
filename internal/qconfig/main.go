@@ -1,6 +1,7 @@
 package qconfig
 
 import (
+	"slices"
 	"sync"
 )
 
@@ -20,13 +21,23 @@ func ListQConfigs(secretName string) []string {
 func AddSecret(configName string, secretName string) {
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()
-
-	SecretToQConfigsRegistry[secretName] = append(SecretToQConfigsRegistry[secretName], configName)
+	if _, ok := SecretToQConfigsRegistry[secretName]; !ok {
+		SecretToQConfigsRegistry[secretName] = []string{configName}
+		return
+	}
+	if ok := slices.Contains(SecretToQConfigsRegistry[secretName], configName); !ok {
+		SecretToQConfigsRegistry[secretName] = append(SecretToQConfigsRegistry[secretName], configName)
+	}
 }
 
-func RemoveSecret(secretName string) {
+func PopSecret(secretName string) []string {
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()
 
-	delete(SecretToQConfigsRegistry, secretName)
+	if qConfigs, ok := SecretToQConfigsRegistry[secretName]; !ok {
+		return make([]string, 0)
+	} else {
+		delete(SecretToQConfigsRegistry, secretName)
+		return qConfigs
+	}
 }

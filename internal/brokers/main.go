@@ -15,14 +15,7 @@ var (
 func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
 	switch config.Spec.Type {
 	case "redis":
-		redisConfig := &RedisConfig{
-			Host:     config.Spec.Config.Host,
-			Port:     config.Spec.Config.Port,
-			Password: config.Spec.Config.Password.Value,
-		}
-		redisClient, err := createBroker(config, func() (Broker, error) {
-			return NewRedisClient(redisConfig)
-		})
+		redisClient, err := createBroker(config, func() (Broker, error) { return NewRedisClient(config) })
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize Redis broker: %w", err)
 		}
@@ -41,11 +34,6 @@ func createBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, erro
 	// Ensure thread-safe access to the registry
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()
-
-	// Check if the broker already exists
-	if broker, exists := BrokerRegistry[configKey]; exists {
-		return broker, nil
-	}
 
 	// Create a new broker if it doesn't exist
 	broker, err := createFunc()

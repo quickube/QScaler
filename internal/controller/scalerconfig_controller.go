@@ -23,7 +23,6 @@ import (
 	"github.com/quickube/QScaler/internal/brokers"
 	"github.com/quickube/QScaler/internal/qconfig"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"reflect"
@@ -60,18 +59,18 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 func (r *ScalerConfigReconciler) reconcileSecret(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	log.Log.Info(fmt.Sprintf("reconcileing secret: %s", req.Name))
+	var qConfigs []string
 
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, req.NamespacedName, secret); err != nil {
-		if errors.IsNotFound(err) {
-			log.Log.Info("secret not found / deleted, this should be handled in a finalizer")
-		} else {
-			log.Log.Error(err, fmt.Sprintf("unable to fetch secret used by scaleConfig %s", req.NamespacedName))
-		}
-		qconfig.RemoveSecret(secret.Name)
+		log.Log.Error(err, fmt.Sprintf("unable to fetch secret used by scaleConfig %s", req.NamespacedName))
+		qConfigs = qconfig.PopSecret(secret.Name)
 		return ctrl.Result{}, err
+	} else {
+		qConfigs = qconfig.ListQConfigs(secret.Name)
 	}
-	for _, configName := range qconfig.ListQConfigs(req.Name) {
+
+	for _, configName := range qConfigs {
 		namespacedName := types.NamespacedName{Namespace: req.Namespace, Name: configName}
 		if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName}); err != nil {
 			return ctrl.Result{}, err
@@ -97,7 +96,7 @@ func (r *ScalerConfigReconciler) reconcileScaler(ctx context.Context, req ctrl.R
 		brokers.RemoveBroker(secretScaleConfig.Namespace, secretScaleConfig.Name)
 		return ctrl.Result{}, err
 	}
-
+	//TODO: what happens if secret is updated
 	broker, err := brokers.NewBroker(secretScaleConfig)
 	if err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
@@ -144,6 +143,7 @@ func (r *ScalerConfigReconciler) loadSecretsFromReferences(ctx context.Context, 
 					if err := r.Get(ctx, namespacedName, actualSecret); err != nil {
 						return err
 					}
+					log.Log.Info(fmt.Sprintf("adding secret to watch: %s", actualSecret.Name))
 					qconfig.AddSecret(config.Name, actualSecret.Name)
 
 					secretData, exists := actualSecret.Data[secretRef.Key]

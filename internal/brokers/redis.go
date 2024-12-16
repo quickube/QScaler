@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/quickube/QScaler/api/v1alpha1"
 
 	"github.com/go-redis/redis/v8"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -46,7 +47,12 @@ func (r *RedisBroker) GetDeathQueue(topic string) string {
 	return fmt.Sprintf("death-%s", topic)
 }
 
-func NewRedisClient(config *RedisConfig) (*RedisBroker, error) {
+func NewRedisClient(scaleConfig *v1alpha1.ScalerConfig) (*RedisBroker, error) {
+	config := &RedisConfig{
+		Host:     scaleConfig.Spec.Config.Host,
+		Port:     scaleConfig.Spec.Config.Port,
+		Password: scaleConfig.Spec.Config.Password.Value,
+	}
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%s", config.Host, config.Port),
 		Password: config.Password,
