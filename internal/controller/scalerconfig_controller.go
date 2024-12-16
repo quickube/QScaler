@@ -50,7 +50,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	_ = log.FromContext(ctx)
 
 	log.Log.Info(fmt.Sprintf("got request for: %+v", req.NamespacedName))
-	if _, ok := qconfig.SecretToQConfigsRegistry[req.Name]; ok {
+	if len(qconfig.ListQConfigs(req.Name)) != 0 {
 		return r.reconcileSecret(ctx, req)
 	}
 
@@ -71,8 +71,7 @@ func (r *ScalerConfigReconciler) reconcileSecret(ctx context.Context, req ctrl.R
 		qconfig.RemoveSecret(secret.Name)
 		return ctrl.Result{}, err
 	}
-
-	for _, configName := range qconfig.SecretToQConfigsRegistry[req.Name] {
+	for _, configName := range qconfig.ListQConfigs(req.Name) {
 		namespacedName := types.NamespacedName{Namespace: req.Namespace, Name: configName}
 		if _, err := r.Reconcile(ctx, ctrl.Request{NamespacedName: namespacedName}); err != nil {
 			return ctrl.Result{}, err
@@ -164,10 +163,7 @@ func (r *ScalerConfigReconciler) loadSecretsFromReferences(ctx context.Context, 
 func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	annotationPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		name := obj.GetName()
-		if _, ok := qconfig.SecretToQConfigsRegistry[name]; ok {
-			return true
-		}
-		return false
+		return len(qconfig.ListQConfigs(name)) != 0
 	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.ScalerConfig{}).

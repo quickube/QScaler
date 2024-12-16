@@ -9,6 +9,14 @@ var (
 	RegistryMutex            sync.Mutex
 )
 
+func ListQConfigs(secretName string) []string {
+	if _, ok := SecretToQConfigsRegistry[secretName]; !ok {
+		return make([]string, 0)
+	}
+	return SecretToQConfigsRegistry[secretName]
+
+}
+
 func AddSecret(configName string, secretName string) {
 	RegistryMutex.Lock()
 	defer RegistryMutex.Unlock()

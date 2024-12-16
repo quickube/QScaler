@@ -65,15 +65,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	// Fetch the ScalerConfig referenced in the QWorker
-	var scalerConfig v1alpha1.ScalerConfig
-	namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
-	if err := r.Get(ctx, namespacedName, &scalerConfig); err != nil {
-		log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
-		return ctrl.Result{Requeue: true}, err
-	}
-
-	BrokerClient, err := brokers.NewBroker(ctx, r.Client, &scalerConfig)
+	BrokerClient, err := brokers.GetBroker(req.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
 	if err != nil {
 		log.Log.Error(err, "Failed to create broker client")
 		return ctrl.Result{Requeue: true}, err
@@ -152,7 +144,7 @@ func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1
 		return err
 	}
 
-	BrokerClient, err := brokers.NewBroker(*ctx, r.Client, &scalerConfig)
+	BrokerClient, err := brokers.GetBroker(qworker.ObjectMeta.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
 	if err != nil {
 		log.Log.Error(err, "Failed to create broker client")
 		return err
