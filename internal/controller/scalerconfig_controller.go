@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
-	"github.com/quickube/QScaler/internal/qconfig"
+	"github.com/quickube/QScaler/internal/secret_manager"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,7 +49,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	_ = log.FromContext(ctx)
 
 	log.Log.Info(fmt.Sprintf("got request for: %+v", req.NamespacedName))
-	if len(qconfig.ListQConfigs(req.Name)) != 0 {
+	if len(secret_manager.ListQConfigs(req.Name)) != 0 {
 		return r.reconcileSecret(ctx, req)
 	}
 
@@ -64,10 +64,10 @@ func (r *ScalerConfigReconciler) reconcileSecret(ctx context.Context, req ctrl.R
 	secret := &corev1.Secret{}
 	if err := r.Get(ctx, req.NamespacedName, secret); err != nil {
 		log.Log.Error(err, fmt.Sprintf("unable to fetch secret used by scaleConfig %s", req.NamespacedName))
-		qConfigs = qconfig.PopSecret(secret.Name)
+		qConfigs = secret_manager.PopSecret(secret.Name)
 		return ctrl.Result{}, err
 	} else {
-		qConfigs = qconfig.ListQConfigs(secret.Name)
+		qConfigs = secret_manager.ListQConfigs(secret.Name)
 	}
 
 	for _, configName := range qConfigs {
@@ -144,7 +144,7 @@ func (r *ScalerConfigReconciler) loadSecretsFromReferences(ctx context.Context, 
 						return err
 					}
 					log.Log.Info(fmt.Sprintf("adding secret to watch: %s", actualSecret.Name))
-					qconfig.AddSecret(config.Name, actualSecret.Name)
+					secret_manager.AddSecret(config.Name, actualSecret.Name)
 
 					secretData, exists := actualSecret.Data[secretRef.Key]
 					if !exists {
@@ -163,7 +163,7 @@ func (r *ScalerConfigReconciler) loadSecretsFromReferences(ctx context.Context, 
 func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	annotationPredicate := predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		name := obj.GetName()
-		return len(qconfig.ListQConfigs(name)) != 0
+		return len(secret_manager.ListQConfigs(name)) != 0
 	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.ScalerConfig{}).

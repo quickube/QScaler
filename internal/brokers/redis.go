@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/internal/secret_manager"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/mitchellh/mapstructure"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -15,9 +17,9 @@ type RedisBroker struct {
 }
 
 type RedisConfig struct {
-	Host     string
-	Port     string
-	Password string
+	Host     string                 `yaml:"host"`
+	Port     string                 `yaml:"port"`
+	Password v1alpha1.ValueOrSecret `yaml:"password"`
 }
 
 func (r *RedisBroker) KillQueue(ctx *context.Context, topic string) error {
@@ -47,15 +49,22 @@ func (r *RedisBroker) GetDeathQueue(topic string) string {
 	return fmt.Sprintf("death-%s", topic)
 }
 
-func NewRedisClient(scaleConfig *v1alpha1.ScalerConfig) (*RedisBroker, error) {
-	config := &RedisConfig{
-		Host:     scaleConfig.Spec.Config.Host,
-		Port:     scaleConfig.Spec.Config.Port,
-		Password: scaleConfig.Spec.Config.Password.Value,
+func NewRedisClient(config *v1alpha1.ScalerConfig) (*RedisBroker, error) {
+	redisConfig := &RedisConfig{}
+	err := mapstructure.Decode(config.Spec, &redisConfig)
+	if err != nil {
+		return nil, err
 	}
+
+	secretManager := secret_manager.NewClient()
+	password, err := secretManager.Get(redisConfig.Password)
+	if err != nil {
+		return nil, err
+	}
+
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", config.Host, config.Port),
-		Password: config.Password,
+		Addr:     fmt.Sprintf("%s:%s", redisConfig.Host, redisConfig.Port),
+		Password: password,
 	})
 
 	return &RedisBroker{
