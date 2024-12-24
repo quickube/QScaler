@@ -79,7 +79,7 @@ func (r *MetricsControllerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, err
 		}
 
-		BrokerClient, err := brokers.NewBroker(&scalerConfig)
+		BrokerClient, err := brokers.GetBroker(req.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
 		if err != nil {
 			log.Log.Error(err, "Failed to create broker client")
 			return ctrl.Result{}, err

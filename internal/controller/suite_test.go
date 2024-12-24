@@ -101,6 +101,12 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(reconciler.SetupWithManager(k8sManager)).To(Succeed())
 
+	metricsReconciler := &MetricsControllerReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}
+	Expect(metricsReconciler.SetupWithManager(k8sManager)).To(Succeed())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
