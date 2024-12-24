@@ -11,5 +11,5 @@ spec:
 #      value: Aa123456
       valueFrom:
         secretKeyRef:
-          name: redis-password
-          key: data
+          name: redis
+          key: redis-password

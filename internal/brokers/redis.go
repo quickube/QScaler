@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/secret_manager"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mitchellh/mapstructure"
@@ -56,8 +57,13 @@ func NewRedisClient(config *v1alpha1.ScalerConfig) (*RedisBroker, error) {
 		return nil, err
 	}
 
-	secretManager := secret_manager.NewClient()
-	password, err := secretManager.Get(redisConfig.Password)
+	secretManager, err := secret_manager.NewClient()
+	if err != nil {
+		return nil, err
+	}
+
+	configName := types.NamespacedName{Namespace: config.Namespace, Name: config.Name}
+	password, err := secretManager.Get(configName, redisConfig.Password)
 	if err != nil {
 		return nil, err
 	}

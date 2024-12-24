@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/google/uuid"
 	"github.com/quickube/QScaler/api/v1alpha1"
@@ -49,6 +50,9 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_ = log.FromContext(ctx)
 	qworker := &v1alpha1.QWorker{}
 	if err := r.Get(ctx, req.NamespacedName, qworker); err != nil {
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 		log.Log.Error(err, "unable to fetch QWorker")
 		return ctrl.Result{}, err
 	}

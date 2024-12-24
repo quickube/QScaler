@@ -3,13 +3,14 @@ package secret_manager
 import (
 	"context"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"os"
-	"sync"
-
 	"github.com/quickube/QScaler/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"os"
+	"slices"
+	"sync"
 )
 
 var (
@@ -17,6 +18,13 @@ var (
 	secretManagerInstance SecretManager
 	once                  sync.Once
 )
+
+type SecretManagerInst struct {
+	registry  map[types.NamespacedName]map[v1alpha1.ValueOrSecret]string
+	client    kubernetes.Interface
+	namespace string
+	mutex     sync.Mutex
+}
 
 func NewClient() (SecretManager, error) {
 	var initErr error
@@ -41,32 +49,27 @@ func NewClient() (SecretManager, error) {
 		}
 
 		// Create the singleton instance
-		secretManagerInstance = &SecretManagerInst{
-			registry:  make(map[v1alpha1.ValueOrSecret]string),
+		secretManager := &SecretManagerInst{
+			registry:  make(map[types.NamespacedName]map[v1alpha1.ValueOrSecret]string),
 			client:    clientset,
 			namespace: string(namespace),
 			mutex:     sync.Mutex{},
 		}
+
+		secretManagerInstance = secretManager
 	})
 
 	return secretManagerInstance, initErr
 }
 
-type SecretManagerInst struct {
-	registry  map[v1alpha1.ValueOrSecret]string
-	client    kubernetes.Interface
-	namespace string
-	mutex     sync.Mutex
-}
-
-func (s *SecretManagerInst) Add(secret v1alpha1.ValueOrSecret) error {
+func (s *SecretManagerInst) Add(configName types.NamespacedName, secret v1alpha1.ValueOrSecret) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	var value []byte
 	var ok bool
 
-	if _, ok = s.registry[secret]; !ok {
+	if _, ok = s.registry[configName][secret]; !ok {
 		return nil
 	}
 	k8sSecret, err := s.client.CoreV1().Secrets(s.namespace).Get(context.Background(), secret.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
@@ -78,49 +81,68 @@ func (s *SecretManagerInst) Add(secret v1alpha1.ValueOrSecret) error {
 		return fmt.Errorf("missing key %s in secret %s", secret.ValueFrom.SecretKeyRef.Key, s.namespace)
 	}
 
-	s.registry[secret] = string(value)
+	s.registry[configName][secret] = string(value)
 
 	return nil
 }
 
-func (s *SecretManagerInst) Delete(secret v1alpha1.ValueOrSecret) error {
+func (s *SecretManagerInst) Delete(configName types.NamespacedName, secret v1alpha1.ValueOrSecret) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+	delete(s.registry[configName], secret)
 
-	if _, ok := s.registry[secret]; !ok {
+	return nil
+}
+
+func (s *SecretManagerInst) Get(configName types.NamespacedName, secret v1alpha1.ValueOrSecret) (string, error) {
+
+	value, ok := s.registry[configName][secret]
+
+	if !ok {
+		return "", fmt.Errorf("secret %s not found in namespace %s", secret, s.namespace)
+	}
+	return value, nil
+}
+
+func (s *SecretManagerInst) Sync(configName types.NamespacedName) error {
+
+	var ok bool
+	var value []byte
+
+	if _, ok = s.registry[configName]; !ok {
+		for secret, _ := range s.registry[configName] {
+			if secret.ValueFrom.SecretKeyRef != nil {
+				k8sSecret, err := s.client.CoreV1().Secrets(s.namespace).Get(context.Background(), secret.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				value, ok = k8sSecret.Data[secret.ValueFrom.SecretKeyRef.Key]
+				if !ok {
+					return fmt.Errorf("missing key %s in secret %s", secret.ValueFrom.SecretKeyRef.Key, s.namespace)
+				}
+				s.registry[configName][secret] = string(value)
+			}
+		}
+
 		return nil
 	}
-
-	delete(s.registry, secret)
-
 	return nil
 }
 
-func (s *SecretManagerInst) Get(secret v1alpha1.ValueOrSecret) (string, error) {
-	return s.registry[secret], nil
-}
-
-func (s *SecretManagerInst) List() ([]v1alpha1.ValueOrSecret, error) {
-	var result []v1alpha1.ValueOrSecret
-
-	for k, _ := range s.registry {
-		result = append(result, k)
+func (s *SecretManagerInst) ListConfigs(secretKey string) ([]types.NamespacedName, error) {
+	var configList []types.NamespacedName
+	for config := range s.registry {
+		for secret, _ := range s.registry[config] {
+			if secret.ValueFrom.SecretKeyRef != nil && secret.ValueFrom.SecretKeyRef.Name == secretKey {
+				if !slices.Contains(configList, config) {
+					configList = append(configList, config)
+				}
+			}
+		}
 	}
-	return result, nil
-}
-
-func (s *SecretManagerInst) Sync() error {
-	for secret, _ := range s.registry {
-		k8sSecret, err := s.client.CoreV1().Secrets(s.namespace).Get(context.Background(), secret.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		value, ok := k8sSecret.Data[secret.ValueFrom.SecretKeyRef.Key]
-		if !ok {
-			return fmt.Errorf("missing key %s in secret %s", secret.ValueFrom.SecretKeyRef.Key, s.namespace)
-		}
-		s.registry[secret] = string(value)
+	if len(configList) == 0 {
+		return nil, fmt.Errorf("secret %s not found in namespace %s", secretKey, s.namespace)
 	}
 
-	return nil
+	return configList, nil
 }

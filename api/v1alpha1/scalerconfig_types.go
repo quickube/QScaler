@@ -52,7 +52,7 @@ type ValueOrSecret struct {
 }
 
 type ValueSources struct {
-	SecretKeyRef corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
+	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
 type ScalerConfigStatus struct {

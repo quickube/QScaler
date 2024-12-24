@@ -19,6 +19,8 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"github.com/quickube/QScaler/internal/secret_informer"
+	"github.com/quickube/QScaler/internal/secret_manager"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -139,6 +141,18 @@ func main() {
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	_, err = secret_manager.NewClient()
+	if err != nil {
+		setupLog.Error(err, "unable to create secret manager")
+		os.Exit(1)
+	}
+
+	err = secret_informer.StartSecretInformer(mgr.GetClient())
+	if err != nil {
+		setupLog.Error(err, "unable to start secret informer")
 		os.Exit(1)
 	}
 
