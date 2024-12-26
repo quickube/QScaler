@@ -51,7 +51,9 @@ type ValueOrSecret struct {
 	Secret *corev1.SecretKeySelector `json:"secret,omitempty"`
 }
 
-type ScalerConfigStatus struct{}
+type ScalerConfigStatus struct {
+	Healthy bool `json:"healthy,omitempty"`
+}
 
 // +kubebuilder:object:root=true
 

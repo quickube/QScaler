@@ -55,10 +55,6 @@ var _ = Describe("QWorker Controller", func() {
 					Type:   "test",
 					Config: v1alpha1.ScalerTypeConfigs{},
 				},
-				Status: v1alpha1.ScalerConfigStatus{
-					Healthy: true,
-					Message: "ScalerConfig is healthy",
-				},
 			}
 
 			By("Setting up a QWorker resource")

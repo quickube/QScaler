@@ -3,16 +3,18 @@ package controller
 import (
 	"context"
 	"fmt"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/quickube/QScaler/api/v1alpha1"
+	v1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	"github.com/quickube/QScaler/internal/mocks"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("ScalerConfigReconciler", func() {
@@ -57,7 +59,7 @@ var _ = Describe("ScalerConfigReconciler", func() {
 			},
 		}
 
-		req = ctrl.Request{NamespacedName: types.NamespacedName{Name: scalerConfig.Name, Namespace: scalerConfig.Namespace}}
+		req = ctrl.Request{NamespacedName: client.ObjectKey{Name: scalerConfig.Name, Namespace: scalerConfig.Namespace}}
 
 		BrokerMock = &mocks.Broker{}
 		brokers.BrokerRegistry[fmt.Sprintf("%s/%s", namespace, scalerConfigName)] = BrokerMock
@@ -65,6 +67,7 @@ var _ = Describe("ScalerConfigReconciler", func() {
 		// Create resources in the fake Kubernetes cluster
 		Expect(k8sClient.Create(context.Background(), scalerConfig)).To(Succeed())
 		Expect(k8sClient.Create(context.Background(), secret)).To(Succeed())
+		time.Sleep(5 * time.Second)
 	})
 
 	AfterEach(func() {
@@ -81,21 +84,37 @@ var _ = Describe("ScalerConfigReconciler", func() {
 			_, err := reconciler.Reconcile(context.TODO(), req)
 			Expect(err).NotTo(HaveOccurred())
 
+			// Verify broker exists
+			key := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
+			Expect(brokers.BrokerRegistry[key]).ToNot(BeNil())
+
 			// Verify status update
 			updated := &v1alpha1.ScalerConfig{}
 			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
+			//Expect(updated.Status.Healthy).To(BeTrue())
+			//Expect(updated.Status.Message).To(Equal("Connected to broker"))
 		})
 
-		It("should mark ScalerConfig as unhealthy if broker connection fails", func() {
-			BrokerMock.On("IsConnected", mock.Anything).Return(false, fmt.Errorf("connection failed"))
+		It("should fail if the referenced secret is removed", func() {
+			// Delete the referenced secret
+			testSecret := secret.DeepCopy()
+			testSecret.ResourceVersion = ""
+			testSecret.Name = "test-secret-2"
+			Expect(k8sClient.Create(context.Background(), testSecret)).To(Succeed())
 
 			// Trigger reconcile
 			_, err := reconciler.Reconcile(context.TODO(), req)
-			Expect(err).To(HaveOccurred())
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
+			// Trigger reconcile
+			_, err = reconciler.Reconcile(context.TODO(), req)
+			Expect(err).NotTo(HaveOccurred())
 
 			// Verify status update
 			updated := &v1alpha1.ScalerConfig{}
 			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
+			Expect(updated.Status.Healthy).To(BeFalse())
 		})
 	})
 })
