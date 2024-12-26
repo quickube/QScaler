@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	v1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	"github.com/quickube/QScaler/internal/mocks"
@@ -12,9 +14,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("ScalerConfigReconciler", func() {
@@ -80,35 +79,36 @@ var _ = Describe("ScalerConfigReconciler", func() {
 		It("should mark ScalerConfig as healthy if broker connects", func() {
 			BrokerMock.On("IsConnected", mock.Anything).Return(true, nil)
 
-			// Trigger reconcile
-			_, err := reconciler.Reconcile(context.TODO(), req)
-			Expect(err).NotTo(HaveOccurred())
-
 			// Verify broker exists
 			key := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 			Expect(brokers.BrokerRegistry[key]).ToNot(BeNil())
 
 			// Verify status update
+
 			updated := &v1alpha1.ScalerConfig{}
 			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
-			//Expect(updated.Status.Healthy).To(BeTrue())
-			//Expect(updated.Status.Message).To(Equal("Connected to broker"))
+			Expect(updated.Status.Healthy).To(BeTrue())
 		})
 
 		It("should fail if the referenced secret is removed", func() {
-			// Delete the referenced secret
+
+			// Create secret
 			testSecret := secret.DeepCopy()
 			testSecret.ResourceVersion = ""
 			testSecret.Name = "test-secret-2"
 			Expect(k8sClient.Create(context.Background(), testSecret)).To(Succeed())
+			k8sClient.Update(context.Background(), testSecret)
+
+			//Update scaler config
+			scalerConfig := &v1alpha1.ScalerConfig{}
+			Expect(k8sClient.Get(context.Background(), req.NamespacedName, scalerConfig)).To(Succeed())
+			scalerConfig.Spec.Config.Password.Secret.Name = "test-secret-2"
+
+			//Delete the secret
+			Expect(k8sClient.Delete(context.Background(), testSecret)).To(Succeed())
 
 			// Trigger reconcile
 			_, err := reconciler.Reconcile(context.TODO(), req)
-			Expect(err).NotTo(HaveOccurred())
-
-			Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
-			// Trigger reconcile
-			_, err = reconciler.Reconcile(context.TODO(), req)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Verify status update

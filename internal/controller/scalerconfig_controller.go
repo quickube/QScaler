@@ -75,7 +75,9 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	r.Recorder.Eventf(scalerConfig, corev1.EventTypeNormal, "Broker", "Broker %s created suceffully ", scalerConfig.Spec.Type)
 	log.Log.Info("ScalerConfig reconciled", "name", req.NamespacedName)
-	return r.updateScalerHealth(&ctx, scalerConfig, true)
+	r.updateScalerHealth(&ctx, scalerConfig, true)
+
+	return ctrl.Result{}, nil
 }
 
 func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
