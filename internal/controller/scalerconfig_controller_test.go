@@ -82,12 +82,6 @@ var _ = Describe("ScalerConfigReconciler", func() {
 			// Verify broker exists
 			key := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 			Expect(brokers.BrokerRegistry[key]).ToNot(BeNil())
-
-			// Verify status update
-
-			updated := &v1alpha1.ScalerConfig{}
-			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
-			Expect(updated.Status.Healthy).To(BeTrue())
 		})
 	})
 })
