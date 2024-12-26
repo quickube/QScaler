@@ -48,34 +48,39 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var err error
 	var ok bool
 
-	_ = log.FromContext(ctx)
-	log.Log.Info(fmt.Sprintf("reconcileing Scaler: %s", req.Name))
+	reqLogger := log.FromContext(ctx)
+	reqLogger.Info(fmt.Sprintf("reconcileing Scaler: %s", req.Name))
 
 	scalerConfig := &v1alpha1.ScalerConfig{}
 	if err = r.Get(ctx, req.NamespacedName, scalerConfig); err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
-		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
+
+		reqLogger.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
 		return ctrl.Result{}, err
 	}
 
 	broker, err := brokers.NewBroker(scalerConfig)
 	if err != nil {
-		log.Log.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
 		r.Recorder.Eventf(scalerConfig, corev1.EventTypeWarning, "FailedToCreateBroker", err.Error())
+		reqLogger.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
+		r.updateScalerHealth(&ctx, scalerConfig, false)
 		return ctrl.Result{}, err
 	}
 
 	r.Recorder.Eventf(scalerConfig, corev1.EventTypeNormal, "Broker", "Broker %s initilizaed", scalerConfig.Spec.Type)
 
 	if ok, err = broker.IsConnected(&ctx); !ok || err != nil {
-		log.Log.Error(err, "Failed to connect to broker", "name", req.NamespacedName)
+		reqLogger.Error(err, "Failed to connect to broker", "name", req.NamespacedName)
+		r.Recorder.Eventf(scalerConfig, corev1.EventTypeWarning, "Broker", "Failed to connect to broker %s", req.NamespacedName)
+		r.updateScalerHealth(&ctx, scalerConfig, false)
 		return ctrl.Result{}, err
 	}
 
 	r.Recorder.Eventf(scalerConfig, corev1.EventTypeNormal, "Broker", "Broker %s created suceffully ", scalerConfig.Spec.Type)
-	log.Log.Info("ScalerConfig reconciled", "name", req.NamespacedName)
+	reqLogger.Info("ScalerConfig reconciled", "name", req.NamespacedName)
+	r.updateScalerHealth(&ctx, scalerConfig, true)
 
 	return ctrl.Result{}, nil
 }
@@ -87,6 +92,15 @@ func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&corev1.Secret{}, // Watch Secret resources
 			handler.EnqueueRequestsFromMapFunc(r.SecretToScalerConfigMapFunc())).
 		Complete(r)
+}
+
+func (r *ScalerConfigReconciler) updateScalerHealth(ctx *context.Context, scalerConfig *v1alpha1.ScalerConfig, health bool) (ctrl.Result, error) {
+	scalerConfig.Status.Healthy = health
+	if err := r.Status().Update(*ctx, scalerConfig); err != nil {
+		log.Log.Error(err, "Failed to update scalerConfig status", "name", scalerConfig.Name)
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
 }
 
 func (r *ScalerConfigReconciler) SecretToScalerConfigMapFunc() func(context.Context, client.Object) []reconcile.Request {

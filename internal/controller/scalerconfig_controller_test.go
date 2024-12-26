@@ -82,6 +82,24 @@ var _ = Describe("ScalerConfigReconciler", func() {
 			// Verify broker exists
 			key := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 			Expect(brokers.BrokerRegistry[key]).ToNot(BeNil())
+
+			// Verify status update
+
+			updated := &v1alpha1.ScalerConfig{}
+			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
+			Expect(updated.Status.Healthy).To(BeTrue())
+		})
+
+		It("should fail if the referenced secret is removed", func() {
+			//Delete the secret
+			Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
+
+			// Verify status update
+			updated := &v1alpha1.ScalerConfig{}
+			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
+			Expect(updated.Status.Healthy).To(BeFalse())
+
+			Expect(k8sClient.Create(context.Background(), secret)).To(Succeed())
 		})
 	})
 })
