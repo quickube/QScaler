@@ -42,6 +42,7 @@ var _ = Describe("QWorker Controller", func() {
 			qworkerResource      *v1alpha1.QWorker
 			scalerConfigResource *v1alpha1.ScalerConfig
 			BrokerMock           *mocks.Broker
+			configKey            = fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 		)
 
 		BeforeEach(func() {
@@ -52,7 +53,7 @@ var _ = Describe("QWorker Controller", func() {
 					Namespace: namespace,
 				},
 				Spec: v1alpha1.ScalerConfigSpec{
-					Type:   "test",
+					Type:   configKey,
 					Config: v1alpha1.ScalerTypeConfigs{},
 				},
 			}
@@ -96,7 +97,6 @@ var _ = Describe("QWorker Controller", func() {
 			Expect(err).NotTo(HaveOccurred(), "Failed to fetch test QWorker resource")
 
 			BrokerMock = &mocks.Broker{}
-			configKey := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 			brokers.BrokerRegistry[configKey] = BrokerMock
 
 		})

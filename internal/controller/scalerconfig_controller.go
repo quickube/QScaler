@@ -22,6 +22,7 @@ import (
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -52,6 +53,10 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	scalerConfig := &v1alpha1.ScalerConfig{}
 	if err = r.Get(ctx, req.NamespacedName, scalerConfig); err != nil {
+		if errors.IsNotFound(err) {
+			return reconcile.Result{}, nil
+		}
+
 		log.Log.Error(err, fmt.Sprintf("unable to fetch ScalerConfig %s", req.NamespacedName))
 		return ctrl.Result{}, err
 	}

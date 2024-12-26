@@ -85,6 +85,9 @@ spec:
             - type
             type: object
           status:
+            properties:
+              healthy:
+                type: boolean
             type: object
         required:
         - spec

@@ -21,9 +21,9 @@ var _ = Describe("ScalerConfigReconciler", func() {
 		scalerConfig     *v1alpha1.ScalerConfig
 		secret           *corev1.Secret
 		req              ctrl.Request
-		BrokerMock       *mocks.Broker
+		BrokerMock2      *mocks.Broker
 		namespace        = "default"
-		scalerConfigName = "test-scalerconfig"
+		scalerConfigName = "test-scalerconfig-2"
 	)
 
 	BeforeEach(func() {
@@ -34,7 +34,7 @@ var _ = Describe("ScalerConfigReconciler", func() {
 				Namespace: namespace,
 			},
 			Spec: v1alpha1.ScalerConfigSpec{
-				Type: "test",
+				Type: fmt.Sprintf("%s/%s", namespace, scalerConfigName),
 				Config: v1alpha1.ScalerTypeConfigs{
 					RedisConfig: v1alpha1.RedisConfig{
 						Password: v1alpha1.ValueOrSecret{
@@ -60,8 +60,9 @@ var _ = Describe("ScalerConfigReconciler", func() {
 
 		req = ctrl.Request{NamespacedName: client.ObjectKey{Name: scalerConfig.Name, Namespace: scalerConfig.Namespace}}
 
-		BrokerMock = &mocks.Broker{}
-		brokers.BrokerRegistry[fmt.Sprintf("%s/%s", namespace, scalerConfigName)] = BrokerMock
+		BrokerMock2 = &mocks.Broker{}
+		brokers.BrokerRegistry[fmt.Sprintf("%s/%s", namespace, scalerConfigName)] = BrokerMock2
+		BrokerMock2.On("IsConnected", mock.Anything).Return(true, nil)
 
 		// Create resources in the fake Kubernetes cluster
 		Expect(k8sClient.Create(context.Background(), scalerConfig)).To(Succeed())
@@ -70,14 +71,13 @@ var _ = Describe("ScalerConfigReconciler", func() {
 	})
 
 	AfterEach(func() {
-		// Cleanup resources
-		Expect(k8sClient.Delete(context.Background(), scalerConfig)).To(Succeed())
-		Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
+		By("Cleaning up resources")
+		Expect(k8sManager.GetClient().Delete(ctx, scalerConfig)).To(Succeed())
+		Expect(k8sManager.GetClient().Delete(ctx, secret)).To(Succeed())
 	})
 
 	Context("Reconcile", func() {
 		It("should mark ScalerConfig as healthy if broker connects", func() {
-			BrokerMock.On("IsConnected", mock.Anything).Return(true, nil)
 
 			// Verify broker exists
 			key := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
@@ -91,25 +91,8 @@ var _ = Describe("ScalerConfigReconciler", func() {
 		})
 
 		It("should fail if the referenced secret is removed", func() {
-
-			// Create secret
-			testSecret := secret.DeepCopy()
-			testSecret.ResourceVersion = ""
-			testSecret.Name = "test-secret-2"
-			Expect(k8sClient.Create(context.Background(), testSecret)).To(Succeed())
-			k8sClient.Update(context.Background(), testSecret)
-
-			//Update scaler config
-			scalerConfig := &v1alpha1.ScalerConfig{}
-			Expect(k8sClient.Get(context.Background(), req.NamespacedName, scalerConfig)).To(Succeed())
-			scalerConfig.Spec.Config.Password.Secret.Name = "test-secret-2"
-
 			//Delete the secret
-			Expect(k8sClient.Delete(context.Background(), testSecret)).To(Succeed())
-
-			// Trigger reconcile
-			_, err := reconciler.Reconcile(context.TODO(), req)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
 
 			// Verify status update
 			updated := &v1alpha1.ScalerConfig{}
