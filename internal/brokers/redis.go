@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/quickube/QScaler/api/v1alpha1"
-	"github.com/quickube/QScaler/internal/secret_manager"
-	"k8s.io/apimachinery/pkg/types"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/mitchellh/mapstructure"
+	"github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/internal/secret_manager"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -52,7 +50,7 @@ func (r *RedisBroker) GetDeathQueue(topic string) string {
 
 func NewRedisClient(config *v1alpha1.ScalerConfig) (*RedisBroker, error) {
 	redisConfig := &RedisConfig{}
-	err := mapstructure.Decode(config.Spec, &redisConfig)
+	err := mapstructure.Decode(config.Spec.Config.RedisConfig, &redisConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +60,7 @@ func NewRedisClient(config *v1alpha1.ScalerConfig) (*RedisBroker, error) {
 		return nil, err
 	}
 
-	configName := types.NamespacedName{Namespace: config.Namespace, Name: config.Name}
-	password, err := secretManager.Get(configName, redisConfig.Password)
+	password, err := secretManager.Get(redisConfig.Password)
 	if err != nil {
 		return nil, err
 	}

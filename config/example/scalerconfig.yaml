@@ -9,7 +9,6 @@ spec:
     port: "6379"
     password:
 #      value: Aa123456
-      valueFrom:
-        secretKeyRef:
-          name: redis
-          key: redis-password
+      secret:
+        name: redis
+        key: redis-password

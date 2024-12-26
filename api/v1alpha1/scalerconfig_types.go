@@ -47,18 +47,11 @@ type RedisConfig struct {
 }
 
 type ValueOrSecret struct {
-	Value     string       `json:"value,omitempty"`
-	ValueFrom ValueSources `json:"valueFrom,omitempty"`
+	Value  string                    `json:"value,omitempty"`
+	Secret *corev1.SecretKeySelector `json:"secret,omitempty"`
 }
 
-type ValueSources struct {
-	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
-}
-
-type ScalerConfigStatus struct {
-	Healthy bool   `json:"healthy,omitempty"`
-	Message string `json:"message,omitempty"`
-}
+type ScalerConfigStatus struct{}
 
 // +kubebuilder:object:root=true
 

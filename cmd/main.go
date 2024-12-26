@@ -19,8 +19,6 @@ package main
 import (
 	"crypto/tls"
 	"flag"
-	"github.com/quickube/QScaler/internal/secret_informer"
-	"github.com/quickube/QScaler/internal/secret_manager"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -144,18 +142,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	_, err = secret_manager.NewClient()
-	if err != nil {
-		setupLog.Error(err, "unable to create secret manager")
-		os.Exit(1)
-	}
-
-	err = secret_informer.StartSecretInformer(mgr.GetClient())
-	if err != nil {
-		setupLog.Error(err, "unable to start secret informer")
-		os.Exit(1)
-	}
-
 	if err = (&controller.QWorkerReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -165,8 +151,9 @@ func main() {
 	}
 
 	if err = (&controller.ScalerConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("ScalerConfig"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ScalerConfig")
 		os.Exit(1)
