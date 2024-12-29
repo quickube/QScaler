@@ -1,8 +1,9 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"reflect"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 // ReferencesSecret checks if any field in the ScalerConfig references a Secret with the given name.

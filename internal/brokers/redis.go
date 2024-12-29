@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/mitchellh/mapstructure"
 	"github.com/quickube/QScaler/api/v1alpha1"

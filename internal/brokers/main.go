@@ -45,7 +45,8 @@ func updateBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, erro
 	registryMutex.Lock()
 	defer registryMutex.Unlock()
 
-	if _, exists := BrokerRegistry[configKey]; exists {
+	_, exists := BrokerRegistry[configKey]
+	if exists {
 		delete(BrokerRegistry, configKey)
 	}
 

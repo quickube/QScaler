@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
@@ -13,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
 )
 
 var _ = Describe("ScalerConfigReconciler", func() {
@@ -91,7 +92,7 @@ var _ = Describe("ScalerConfigReconciler", func() {
 		})
 
 		It("should fail if the referenced secret is removed", func() {
-			//Delete the secret
+			// Delete the secret
 			Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
 
 			// Verify status update

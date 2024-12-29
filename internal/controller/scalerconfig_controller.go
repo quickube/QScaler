@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
@@ -65,7 +66,7 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err != nil {
 		r.Recorder.Eventf(scalerConfig, corev1.EventTypeWarning, "FailedToCreateBroker", err.Error())
 		reqLogger.Error(err, fmt.Sprintf("unable to create broker %s", req.NamespacedName))
-		r.updateScalerHealth(&ctx, scalerConfig, false)
+		_ = r.updateScalerHealth(&ctx, scalerConfig, false)
 		return ctrl.Result{}, err
 	}
 
@@ -74,13 +75,16 @@ func (r *ScalerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if ok, err = broker.IsConnected(&ctx); !ok || err != nil {
 		reqLogger.Error(err, "Failed to connect to broker", "name", req.NamespacedName)
 		r.Recorder.Eventf(scalerConfig, corev1.EventTypeWarning, "Broker", "Failed to connect to broker %s", req.NamespacedName)
-		r.updateScalerHealth(&ctx, scalerConfig, false)
+		_ = r.updateScalerHealth(&ctx, scalerConfig, false)
 		return ctrl.Result{}, err
 	}
 
 	r.Recorder.Eventf(scalerConfig, corev1.EventTypeNormal, "Broker", "Broker %s created suceffully ", scalerConfig.Spec.Type)
 	reqLogger.Info("ScalerConfig reconciled", "name", req.NamespacedName)
-	r.updateScalerHealth(&ctx, scalerConfig, true)
+	err = r.updateScalerHealth(&ctx, scalerConfig, true)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -94,13 +98,13 @@ func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ScalerConfigReconciler) updateScalerHealth(ctx *context.Context, scalerConfig *v1alpha1.ScalerConfig, health bool) (ctrl.Result, error) {
+func (r *ScalerConfigReconciler) updateScalerHealth(ctx *context.Context, scalerConfig *v1alpha1.ScalerConfig, health bool) error {
 	scalerConfig.Status.Healthy = health
 	if err := r.Status().Update(*ctx, scalerConfig); err != nil {
 		log.Log.Error(err, "Failed to update scalerConfig status", "name", scalerConfig.Name)
-		return ctrl.Result{}, err
+		return err
 	}
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *ScalerConfigReconciler) SecretToScalerConfigMapFunc() func(context.Context, client.Object) []reconcile.Request {
