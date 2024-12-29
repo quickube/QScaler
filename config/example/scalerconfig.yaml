@@ -8,8 +8,8 @@ spec:
     host: redis-master.default.svc.cluster.local
     port: "6379"
     password:
-#      value: Aa123456
-      valueFrom:
-        secretKeyRef:
-          name: redis-password
-          key: data
+      value: Aa123456
+#      valueFrom:
+#        secretKeyRef:
+#          name: redis-password
+#          key: data

@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"github.com/quickube/QScaler/internal/metrics"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -101,11 +102,7 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(reconciler.SetupWithManager(k8sManager)).To(Succeed())
 
-	metricsReconciler := &MetricsControllerReconciler{
-		Client: k8sManager.GetClient(),
-		Scheme: k8sManager.GetScheme(),
-	}
-	Expect(metricsReconciler.SetupWithManager(k8sManager)).To(Succeed())
+	go metrics.StartServer(k8sManager)
 
 	go func() {
 		defer GinkgoRecover()

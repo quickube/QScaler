@@ -2,12 +2,11 @@ package metrics
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sync"
 	"time"
 
 	"github.com/quickube/QScaler/api/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -16,28 +15,22 @@ var (
 	once                  sync.Once
 )
 
-func getMetricsServer(client client.Client) *MetricsServer {
+func getMetricsServer(mgr manager.Manager) *MetricsServer {
 	once.Do(func() {
 		metricsServerInstance = &MetricsServer{
-			client:   client,
+			client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
 			qworkers: &v1alpha1.QWorkerList{},
 		}
 	})
 	return metricsServerInstance
 }
 
-func StartServer() {
+func StartServer(mgr manager.Manager) {
 	ctx := context.Background()
 	_ = log.FromContext(ctx)
 
-	kubeClient, err := client.New(config.GetConfigOrDie(), client.Options{})
-	if err != nil {
-		log.Log.Error(err, "failed to create Kubernetes client")
-		return
-	}
-
-	server := getMetricsServer(kubeClient)
-
+	server := getMetricsServer(mgr)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 

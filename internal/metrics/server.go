@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -13,7 +14,16 @@ import (
 type MetricsServer struct {
 	client   client.Client
 	qworkers *v1alpha1.QWorkerList
+	Scheme   *runtime.Scheme
 }
+
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
+
+// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/finalizers,verbs=update
 
 func (s *MetricsServer) Run(ctx context.Context) error {
 	log.Log.Info("Starting QScaler Metrics Server")
@@ -62,6 +72,10 @@ func (s *MetricsServer) Run(ctx context.Context) error {
 	}
 	return nil
 }
+
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 
 func (s *MetricsServer) Sync(ctx context.Context) error {
 	_ = log.FromContext(ctx)
