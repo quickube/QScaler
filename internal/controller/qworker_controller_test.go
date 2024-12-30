@@ -28,26 +28,21 @@ import (
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("QWorker Controller", func() {
 	Context("Reconciliation logic", func() {
-		var (
-			resourceName         = "test-qworker"
-			namespace            = "default"
-			scalerConfigName     = "test-scalerconfig"
-			qworkerNamespaced    = types.NamespacedName{Name: resourceName, Namespace: namespace}
-			qworkerResource      *v1alpha1.QWorker
-			scalerConfigResource *v1alpha1.ScalerConfig
-			BrokerMock           *mocks.Broker
-			configKey            = fmt.Sprintf("%s/%s", namespace, scalerConfigName)
-		)
+		It("should reconcile successfully and update QWorker status", func() {
+			// Unique test identifiers
+			testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
+			resourceName := fmt.Sprintf("qworker-%s", testID)
+			scalerConfigName := fmt.Sprintf("scalerconfig-%s", testID)
+			namespace := "default"
+			configKey := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 
-		BeforeEach(func() {
-			By("Setting up a ScalerConfig resource")
-			scalerConfigResource = &v1alpha1.ScalerConfig{
+			// Create ScalerConfig resource
+			scalerConfigResource := &v1alpha1.ScalerConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      scalerConfigName,
 					Namespace: namespace,
@@ -57,9 +52,10 @@ var _ = Describe("QWorker Controller", func() {
 					Config: v1alpha1.ScalerTypeConfigs{},
 				},
 			}
+			Expect(k8sClient.Create(ctx, scalerConfigResource)).To(Succeed())
 
-			By("Setting up a QWorker resource")
-			qworkerResource = &v1alpha1.QWorker{
+			// Create QWorker resource
+			qworkerResource := &v1alpha1.QWorker{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
@@ -83,55 +79,91 @@ var _ = Describe("QWorker Controller", func() {
 				},
 				Status: v1alpha1.QWorkerStatus{},
 			}
-
-			By("Creating resources")
-			Expect(k8sClient.Create(ctx, scalerConfigResource)).To(Succeed())
 			Expect(k8sClient.Create(ctx, qworkerResource)).To(Succeed())
 
-			By("Retrieve the QWorker resource to ensure it was created")
-			createdQWorker := &v1alpha1.QWorker{}
-			err := k8sClient.Get(ctx, ctrlclient.ObjectKey{
-				Namespace: namespace,
-				Name:      resourceName,
-			}, createdQWorker)
-			Expect(err).NotTo(HaveOccurred(), "Failed to fetch test QWorker resource")
+			// Mock Broker
+			brokerMock := &mocks.Broker{}
+			brokers.BrokerRegistry[configKey] = brokerMock
+			brokerMock.On("GetQueueLength", mock.Anything, mock.Anything).Return(5, nil)
+			brokerMock.On("IsConnected", mock.Anything).Return(true, nil)
 
-			BrokerMock = &mocks.Broker{}
-			brokers.BrokerRegistry[configKey] = BrokerMock
-
-		})
-
-		AfterEach(func() {
-			By("Cleaning up resources")
-			Expect(k8sManager.GetClient().Delete(ctx, qworkerResource)).To(Succeed())
-			Expect(k8sManager.GetClient().Delete(ctx, scalerConfigResource)).To(Succeed())
-		})
-
-		It("should reconcile successfully and update QWorker status", func() {
-			By("Setting broker mocks")
-			BrokerMock.On("GetQueueLength", mock.Anything, mock.Anything).Return(5, nil)
-			BrokerMock.On("IsConnected", mock.Anything).Return(true, nil)
-
+			// Wait for reconciliation
 			time.Sleep(5 * time.Second)
-			By("Checking QWorker status")
+
+			// Check QWorker status
 			retrievedQWorker := &v1alpha1.QWorker{}
-			Expect(k8sClient.Get(ctx, qworkerNamespaced, retrievedQWorker)).To(Succeed())
+			Expect(k8sClient.Get(ctx, ctrlclient.ObjectKey{Name: resourceName, Namespace: namespace}, retrievedQWorker)).To(Succeed())
 			Expect(retrievedQWorker.Status.CurrentReplicas).To(BeNumerically(">=", 1))
 			Expect(retrievedQWorker.Status.DesiredReplicas).To(BeNumerically("==", 5))
 
+			// Cleanup resources
+			Expect(k8sManager.GetClient().Delete(ctx, qworkerResource)).To(Succeed())
+			Expect(k8sManager.GetClient().Delete(ctx, scalerConfigResource)).To(Succeed())
+			delete(brokers.BrokerRegistry, configKey)
 		})
 
 		It("should scale up pods when needed", func() {
-			By("Setting broker mocks")
-			BrokerMock.On("GetQueueLength", mock.Anything, mock.Anything).Return(5, nil)
-			BrokerMock.On("IsConnected", mock.Anything).Return(true, nil)
+			// Unique test identifiers
+			testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
+			resourceName := fmt.Sprintf("qworker-%s", testID)
+			scalerConfigName := fmt.Sprintf("scalerconfig-%s", testID)
+			namespace := "default"
+			configKey := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
+
+			// Create ScalerConfig resource
+			scalerConfigResource := &v1alpha1.ScalerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      scalerConfigName,
+					Namespace: namespace,
+				},
+				Spec: v1alpha1.ScalerConfigSpec{
+					Type:   configKey,
+					Config: v1alpha1.ScalerTypeConfigs{},
+				},
+			}
+			Expect(k8sClient.Create(ctx, scalerConfigResource)).To(Succeed())
+
+			// Create QWorker resource
+			qworkerResource := &v1alpha1.QWorker{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: namespace,
+				},
+				Spec: v1alpha1.QWorkerSpec{
+					PodSpec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "worker-container",
+								Image: "busybox",
+							},
+						},
+					},
+					ScaleConfig: v1alpha1.QWorkerScaleConfig{
+						ScalerConfigRef: scalerConfigName,
+						Queue:           "test-queue",
+						MinReplicas:     1,
+						MaxReplicas:     5,
+						ScalingFactor:   1,
+					},
+				},
+				Status: v1alpha1.QWorkerStatus{},
+			}
+			Expect(k8sClient.Create(ctx, qworkerResource)).To(Succeed())
+
+			// Mock Broker
+			brokerMock := &mocks.Broker{}
+			brokers.BrokerRegistry[configKey] = brokerMock
+			brokerMock.On("GetQueueLength", mock.Anything, mock.Anything).Return(5, nil)
+			brokerMock.On("IsConnected", mock.Anything).Return(true, nil)
+
+			// Wait for reconciliation
 			time.Sleep(5 * time.Second)
 
-			By("Retrieving all Pods in the namespace")
+			// Retrieve Pods
 			podList := &corev1.PodList{}
 			Expect(k8sClient.List(ctx, podList, ctrlclient.InNamespace(namespace))).To(Succeed())
 
-			By("Filtering Pods by owner reference")
+			// Filter Pods by owner reference
 			ownedPods := []corev1.Pod{}
 			for _, pod := range podList.Items {
 				for _, ownerRef := range pod.OwnerReferences {
@@ -141,11 +173,10 @@ var _ = Describe("QWorker Controller", func() {
 				}
 			}
 
-			By("Deleting all Pods")
+			// Delete all Pods
 			for _, pod := range ownedPods {
-				// Create delete options with GracePeriodSeconds set to 0
 				deleteOptions := &ctrlclient.DeleteOptions{
-					GracePeriodSeconds: new(int64), // A pointer to 0
+					GracePeriodSeconds: new(int64), // Pointer to 0
 				}
 				*deleteOptions.GracePeriodSeconds = 0
 
@@ -154,10 +185,14 @@ var _ = Describe("QWorker Controller", func() {
 
 			time.Sleep(5 * time.Second)
 
-			By("Verifying the number of Pods matches the desired replicas")
+			// Verify desired replicas match Pod count
 			Expect(k8sClient.Get(ctx, ctrlclient.ObjectKeyFromObject(qworkerResource), qworkerResource)).To(Succeed())
-			Expect(ownedPods).To(HaveLen(qworkerResource.Status.DesiredReplicas))
-		})
+			Expect(len(ownedPods)).To(Equal(qworkerResource.Status.DesiredReplicas))
 
+			// Cleanup resources
+			Expect(k8sManager.GetClient().Delete(ctx, qworkerResource)).To(Succeed())
+			Expect(k8sManager.GetClient().Delete(ctx, scalerConfigResource)).To(Succeed())
+			delete(brokers.BrokerRegistry, configKey)
+		})
 	})
 })
