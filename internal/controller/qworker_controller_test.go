@@ -122,7 +122,6 @@ var _ = Describe("QWorker Controller", func() {
 				},
 			}
 			Expect(k8sClient.Create(ctx, scalerConfigResource)).To(Succeed())
-      
 			// Create QWorker resource
 			qworkerResource := &v1alpha1.QWorker{
 				ObjectMeta: metav1.ObjectMeta{

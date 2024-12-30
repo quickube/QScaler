@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -2,12 +2,12 @@ package metrics
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sync"
 	"time"
 
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 var (
