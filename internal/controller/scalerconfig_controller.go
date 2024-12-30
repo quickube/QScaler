@@ -125,6 +125,7 @@ func (r *ScalerConfigReconciler) SecretToScalerConfigMapFunc() func(context.Cont
 		var requests []reconcile.Request
 		for _, scalerConfig := range scalerConfigList.Items {
 			if scalerConfig.ReferencesSecret(secret.Name) {
+				log.Log.Info("reconsiling due to secret change", "name", scalerConfig.Name)
 				// Enqueue a reconcile request for the ScalerConfig
 				requests = append(requests, reconcile.Request{
 					NamespacedName: client.ObjectKey{
