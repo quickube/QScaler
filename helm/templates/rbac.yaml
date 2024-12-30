@@ -6,51 +6,51 @@ metadata:
   labels:
     {{- include "qscaler.labels" . | nindent 4 }}
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - quickube.com
-  resources:
-  - qworkers
-  - scalerconfigs
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - quickube.com
-  resources:
-  - qworkers/finalizers
-  - scalerconfigs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - quickube.com
-  resources:
-  - qworkers/status
-  - scalerconfigs/status
-  verbs:
-  - get
-  - patch
-  - update
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - quickube.com
+    resources:
+      - qworkers
+      - scalerconfigs
+    verbs:
+      - create
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - quickube.com
+    resources:
+      - qworkers/finalizers
+      - scalerconfigs/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - quickube.com
+    resources:
+      - qworkers/status
+      - scalerconfigs/status
+    verbs:
+      - get
+      - patch
+      - update
 ---
 # permissions to do leader election.
 apiVersion: rbac.authorization.k8s.io/v1
@@ -91,34 +91,66 @@ rules:
     verbs:
       - create
       - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+  name: {{ include "qscaler.fullname" . }}-qworker
+rules:
+  - apiGroups:
+      - quickube.com
+    resources:
+      - qworkers
+      - scalerconfigs
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+  name: {{ include "qscaler.fullname" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "qscaler.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "qscaler.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+  name: {{ include "qscaler.fullname" . }}-leader-election
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "qscaler.fullname" . }}-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "qscaler.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    {{- include "qscaler.labels" . | nindent 4 }}
+  name: {{ include "qscaler.fullname" . }}-qworker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "qscaler.fullname" . }}-qworker
+subjects:
+  - kind: ServiceAccount
+    name: qworker
+    namespace: {{ .Release.Namespace }}
 
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    {{- include "qscaler.labels" . | nindent 4 }}
-  name: {{ include "qscaler.fullname" . }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ include "qscaler.fullname" . }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "qscaler.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  labels:
-    {{- include "qscaler.labels" . | nindent 4 }}
-  name: {{ include "qscaler.fullname" . }}-leader-election
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ include "qscaler.fullname" . }}-leader-election
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "qscaler.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
