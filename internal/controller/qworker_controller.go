@@ -24,6 +24,7 @@ import (
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -49,32 +50,35 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	_ = log.FromContext(ctx)
 	qworker := &v1alpha1.QWorker{}
 	if err := r.Get(ctx, req.NamespacedName, qworker); err != nil {
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 		log.Log.Error(err, "unable to fetch QWorker")
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 
 	var podList corev1.PodList
 	if err := r.List(ctx, &podList, client.InNamespace(req.Namespace), client.MatchingFields{"metadata.ownerReferences.name": qworker.Name}); err != nil {
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 	currentPodCount := len(podList.Items)
 	qworker.Status.CurrentReplicas = currentPodCount
 
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		log.Log.Error(err, fmt.Sprintf("Failed to update QWorker status %s", qworker.Name))
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 
 	BrokerClient, err := brokers.GetBroker(req.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
 	if err != nil {
 		log.Log.Error(err, "Failed to get broker client")
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 
 	QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
 	if err != nil {
 		log.Log.Error(err, "Failed to get queue length")
-		return ctrl.Result{Requeue: true}, err
+		return ctrl.Result{}, err
 	}
 	log.Log.Info(fmt.Sprintf("current queue length: %d", QueueLength))
 
@@ -91,14 +95,14 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if diffAmount > 0 {
 			for range diffAmount {
 				if err := r.StartWorker(&ctx, qworker); err != nil {
-					return ctrl.Result{Requeue: true}, err
+					return ctrl.Result{}, err
 				}
 			}
 
 		} else if diffAmount < 0 {
 			for range diffAmount * -1 {
 				if err := r.RemoveWorker(&ctx, qworker); err != nil {
-					return ctrl.Result{Requeue: true}, err
+					return ctrl.Result{}, err
 				}
 			}
 		}
