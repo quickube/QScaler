@@ -117,7 +117,7 @@ func (r *ScalerConfigReconciler) SecretToScalerConfigMapFunc() func(context.Cont
 
 		// List all ScalerConfig resources in the same namespace as the Secret
 		scalerConfigList := &v1alpha1.ScalerConfigList{}
-		if err := r.List(context.TODO(), scalerConfigList, client.InNamespace(secret.Namespace)); err != nil {
+		if err := r.List(ctx, scalerConfigList, client.InNamespace(secret.Namespace)); err != nil {
 			return nil // Return an empty list if the listing fails
 		}
 

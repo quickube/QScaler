@@ -87,20 +87,28 @@ var _ = Describe("ScalerConfigReconciler", func() {
 			// Verify status update
 
 			updated := &v1alpha1.ScalerConfig{}
-			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
+			Expect(k8sClient.Get(ctx, req.NamespacedName, updated)).To(Succeed())
 			Expect(updated.Status.Healthy).To(BeTrue())
 		})
 
-		It("should fail if the referenced secret is removed", func() {
+		It("should set healthy to false if the referenced secret is removed", func() {
 			// Delete the secret
-			Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+
+			time.Sleep(10 * time.Second)
+			// Sync reconciler trigger
+			_, err := reconciler2.Reconcile(ctx, req)
+			Expect(err).To(Succeed())
 
 			// Verify status update
 			updated := &v1alpha1.ScalerConfig{}
-			Expect(k8sClient.Get(context.Background(), req.NamespacedName, updated)).To(Succeed())
+			Expect(k8sClient.Get(ctx, req.NamespacedName, updated)).To(Succeed())
+
 			Expect(updated.Status.Healthy).To(BeFalse())
 
-			Expect(k8sClient.Create(context.Background(), secret)).To(Succeed())
+			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+			_, err = reconciler2.Reconcile(ctx, req)
+			Expect(err).To(Succeed())
 		})
 	})
 })
