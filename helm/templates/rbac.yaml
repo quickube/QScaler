@@ -104,8 +104,10 @@ rules:
     resources:
       - qworkers
       - scalerconfigs
+      - pods
     verbs:
       - get
+      - patch
       - list
       - watch
 ---
