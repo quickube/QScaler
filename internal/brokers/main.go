@@ -2,6 +2,7 @@ package brokers
 
 import (
 	"fmt"
+
 	"sync"
 
 	"github.com/quickube/QScaler/api/v1alpha1"
@@ -9,13 +10,22 @@ import (
 
 var (
 	BrokerRegistry = make(map[string]Broker)
-	RegistryMutex  sync.Mutex
+	registryMutex  sync.Mutex
 )
+
+func GetBroker(namespace string, name string) (Broker, error) {
+	configKey := fmt.Sprintf("%s/%s", namespace, name)
+
+	if broker, exists := BrokerRegistry[configKey]; exists {
+		return broker, nil
+	}
+	return nil, fmt.Errorf("broker not found for %s", configKey)
+}
 
 func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
 	switch config.Spec.Type {
 	case "redis":
-		redisClient, err := createBroker(config, func() (Broker, error) { return NewRedisClient(config) })
+		redisClient, err := updateBroker(config, func() (Broker, error) { return NewRedisClient(config) })
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize Redis broker: %w", err)
 		}
@@ -29,13 +39,17 @@ func NewBroker(config *v1alpha1.ScalerConfig) (Broker, error) {
 	}
 }
 
-func createBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error)) (Broker, error) {
+func updateBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, error)) (Broker, error) {
 	configKey := fmt.Sprintf("%s/%s", config.Namespace, config.Name)
 	// Ensure thread-safe access to the registry
-	RegistryMutex.Lock()
-	defer RegistryMutex.Unlock()
+	registryMutex.Lock()
+	defer registryMutex.Unlock()
 
-	// Create a new broker if it doesn't exist
+	_, exists := BrokerRegistry[configKey]
+	if exists {
+		delete(BrokerRegistry, configKey)
+	}
+
 	broker, err := createFunc()
 	if err != nil {
 		return nil, err
@@ -44,23 +58,4 @@ func createBroker(config *v1alpha1.ScalerConfig, createFunc func() (Broker, erro
 	// Store the broker in the registry
 	BrokerRegistry[configKey] = broker
 	return broker, nil
-}
-
-func GetBroker(namespace string, name string) (Broker, error) {
-	configKey := fmt.Sprintf("%s/%s", namespace, name)
-
-	RegistryMutex.Lock()
-	defer RegistryMutex.Unlock()
-	if broker, exists := BrokerRegistry[configKey]; exists {
-		return broker, nil
-	}
-	return nil, fmt.Errorf("broker not found for %s", configKey)
-}
-
-func RemoveBroker(namespace string, name string) {
-	configKey := fmt.Sprintf("%s/%s", namespace, name)
-	RegistryMutex.Lock()
-	defer RegistryMutex.Unlock()
-
-	delete(BrokerRegistry, configKey)
 }

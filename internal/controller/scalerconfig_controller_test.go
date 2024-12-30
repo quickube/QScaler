@@ -1,134 +1,155 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
 	"context"
-	"github.com/quickube/QScaler/api/v1alpha1"
-	"github.com/stretchr/testify/assert"
+	"fmt"
+
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	v1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/internal/brokers"
+	"github.com/quickube/QScaler/internal/mocks"
+	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtimeclient "sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"testing"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func TestFetchSecretsFromReferences(t *testing.T) {
-	globalConfig := &v1alpha1.ScalerConfig{
-		Spec: v1alpha1.ScalerConfigSpec{
-			Type:   "test-type",
-			Config: v1alpha1.ScalerTypeConfigs{}}}
+var _ = Describe("ScalerConfigReconciler", func() {
+	Context("Reconcile", func() {
+		It("should mark ScalerConfig as healthy if broker connects", func() {
+			// Unique identifier for this test
+			testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
+			scalerConfigName := fmt.Sprintf("scalerconfig-%s", testID)
+			secretName := fmt.Sprintf("secret-%s", testID)
+			brokerKey := fmt.Sprintf("%s/%s", "default", scalerConfigName)
 
-	t.Run("Fail on Secret not found", func(t *testing.T) {
-		// Prepare
-		mockClient := runtimeclient.NewFakeClient()
-		controllerReconciler := ScalerConfigReconciler{
-			Client: mockClient,
-			Scheme: mockClient.Scheme(),
-		}
-		ctx := context.Background()
-
-		config := globalConfig.DeepCopy()
-		config.Spec.Config = v1alpha1.ScalerTypeConfigs{
-			RedisConfig: v1alpha1.RedisConfig{
-				Host: "host",
-				Port: "0",
-				Password: v1alpha1.ValueOrSecret{
-					Value: "",
-					ValueFrom: v1alpha1.ValueSources{
-						SecretKeyRef: corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "missing-secret"},
-							Key:                  "test-key",
+			// Create test resources
+			scalerConfig := &v1alpha1.ScalerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      scalerConfigName,
+					Namespace: "default",
+				},
+				Spec: v1alpha1.ScalerConfigSpec{
+					Type: brokerKey,
+					Config: v1alpha1.ScalerTypeConfigs{
+						RedisConfig: v1alpha1.RedisConfig{
+							Password: v1alpha1.ValueOrSecret{
+								Secret: &corev1.SecretKeySelector{
+									Key:                  "password",
+									LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+								},
+							},
 						},
 					},
 				},
-			},
-		}
-		// Execute
-		err := controllerReconciler.loadSecretsFromReferences(ctx, config)
+			}
 
-		// Assert
-		assert.Error(t, err)
-		assert.Equal(t, err.Error(), "secrets \"missing-secret\" not found")
-	})
-	t.Run("Fail on key not in secret", func(t *testing.T) {
-		// Prepare
-		fakeSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "some-secret"}, Data: map[string][]byte{"other-key": {}}}
-		mockClient := runtimeclient.NewClientBuilder().WithObjects(fakeSecret).Build()
-		controllerReconciler := ScalerConfigReconciler{
-			Client: mockClient,
-			Scheme: mockClient.Scheme(),
-		}
-		ctx := context.Background()
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"password": []byte("password"),
+				},
+			}
 
-		config := globalConfig.DeepCopy()
-		config.Spec.Config = v1alpha1.ScalerTypeConfigs{
-			RedisConfig: v1alpha1.RedisConfig{
-				Host: "host",
-				Port: "0",
-				Password: v1alpha1.ValueOrSecret{
-					Value: "",
-					ValueFrom: v1alpha1.ValueSources{
-						SecretKeyRef: corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "some-secret"},
-							Key:                  "test-key",
+			// Mock broker
+			brokerMock := &mocks.Broker{}
+			brokers.BrokerRegistry[brokerKey] = brokerMock
+			brokerMock.On("IsConnected", mock.Anything).Return(true, nil)
+
+			// Create resources in the fake Kubernetes cluster
+			Expect(k8sClient.Create(context.Background(), scalerConfig)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), secret)).To(Succeed())
+
+			// Verify broker exists
+			broker, err := brokers.GetBroker("default", scalerConfigName)
+			Expect(broker).ToNot(BeNil(), "expected broker to be non-nil")
+			Expect(err).ToNot(HaveOccurred(), "expected no error when retrieving broker")
+
+			// Verify status update using Eventually
+			updated := &v1alpha1.ScalerConfig{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: scalerConfigName, Namespace: "default"}, updated)
+				if err != nil {
+					return false
+				}
+				return updated.Status.Healthy
+			}, time.Second*10, time.Millisecond*500).Should(BeTrue(), "ScalerConfig should be marked as healthy")
+
+			// Cleanup resources
+			Expect(k8sManager.GetClient().Delete(ctx, scalerConfig)).To(Succeed())
+			Expect(k8sManager.GetClient().Delete(ctx, secret)).To(Succeed())
+			delete(brokers.BrokerRegistry, brokerKey)
+		})
+
+		It("should set healthy to false if the referenced secret is removed", func() {
+			// Unique identifier for this test
+			testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
+			scalerConfigName := fmt.Sprintf("scalerconfig-%s", testID)
+			secretName := fmt.Sprintf("secret-%s", testID)
+			brokerKey := fmt.Sprintf("%s/%s", "default", scalerConfigName)
+
+			// Create test resources
+			scalerConfig := &v1alpha1.ScalerConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      scalerConfigName,
+					Namespace: "default",
+				},
+				Spec: v1alpha1.ScalerConfigSpec{
+					Type: brokerKey,
+					Config: v1alpha1.ScalerTypeConfigs{
+						RedisConfig: v1alpha1.RedisConfig{
+							Password: v1alpha1.ValueOrSecret{
+								Secret: &corev1.SecretKeySelector{
+									Key:                  "password",
+									LocalObjectReference: corev1.LocalObjectReference{Name: secretName},
+								},
+							},
 						},
 					},
 				},
-			},
-		}
-		// Execute
-		err := controllerReconciler.loadSecretsFromReferences(ctx, config)
+			}
 
-		// Assert
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "key not found in secret")
-	})
-	t.Run("Successfully fetches secret and sets Value field", func(t *testing.T) {
-		// Prepare
-		fakeSecret := &corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "some-secret"}, Data: map[string][]byte{"some-key": []byte("data")}}
-		mockClient := runtimeclient.NewClientBuilder().WithObjects(fakeSecret).Build()
-		controllerReconciler := ScalerConfigReconciler{
-			Client: mockClient,
-			Scheme: mockClient.Scheme(),
-		}
-		ctx := context.Background()
-
-		config := globalConfig.DeepCopy()
-		config.Spec.Config = v1alpha1.ScalerTypeConfigs{
-			RedisConfig: v1alpha1.RedisConfig{
-				Host: "host",
-				Port: "0",
-				Password: v1alpha1.ValueOrSecret{
-					Value: "",
-					ValueFrom: v1alpha1.ValueSources{
-						SecretKeyRef: corev1.SecretKeySelector{
-							LocalObjectReference: corev1.LocalObjectReference{Name: "some-secret"},
-							Key:                  "some-key",
-						},
-					},
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: "default",
 				},
-			},
-		}
-		// Execute
-		err := controllerReconciler.loadSecretsFromReferences(ctx, config)
+				Data: map[string][]byte{
+					"password": []byte("password"),
+				},
+			}
 
-		// Assert
-		assert.NoError(t, err)
-		assert.Equal(t, "data", config.Spec.Config.Password.Value)
+			// Mock broker
+			brokerMock := &mocks.Broker{}
+			brokers.BrokerRegistry[brokerKey] = brokerMock
+			brokerMock.On("IsConnected", mock.Anything).Return(false, nil)
 
+			// Create resources in the fake Kubernetes cluster
+			Expect(k8sClient.Create(context.Background(), scalerConfig)).To(Succeed())
+			Expect(k8sClient.Create(context.Background(), secret)).To(Succeed())
+
+			// Delete secret
+			Expect(k8sClient.Delete(context.Background(), secret)).To(Succeed())
+
+			// Verify status update using Eventually
+			updated := &v1alpha1.ScalerConfig{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, client.ObjectKey{Name: scalerConfigName, Namespace: "default"}, updated)
+				if err != nil {
+					return false
+				}
+				return updated.Status.Healthy
+			}, time.Second*10, time.Millisecond*500).Should(BeFalse(), "ScalerConfig should be marked as unhealthy")
+
+			// Cleanup resources
+			Expect(k8sManager.GetClient().Delete(ctx, scalerConfig)).To(Succeed())
+			delete(brokers.BrokerRegistry, brokerKey)
+		})
 	})
-}
+})

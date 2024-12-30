@@ -50,6 +50,7 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var reconciler *QWorkerReconciler
+var reconciler2 *ScalerConfigReconciler
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -102,7 +103,16 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(reconciler.SetupWithManager(k8sManager)).To(Succeed())
 
+
 	go metrics.StartServer(k8sManager)
+
+	By("Initializing the ScalerConfigReconciler")
+	reconciler2 = &ScalerConfigReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("ScalerConfig"),
+	}
+	Expect(reconciler2.SetupWithManager(k8sManager)).To(Succeed())
 
 	go func() {
 		defer GinkgoRecover()
