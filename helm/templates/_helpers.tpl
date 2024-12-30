@@ -60,3 +60,14 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create the name of the worker service account to use
+*/}}
+{{- define "qscaler.workerServiceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "qscaler.serviceAccount.workerName" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" "qworker" }}
+{{- end }}
+{{- end }}
