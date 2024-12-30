@@ -26,11 +26,17 @@ func getMetricsServer(mgr manager.Manager) *MetricsServer {
 	return metricsServerInstance
 }
 
-func StartServer(mgr manager.Manager) {
-	ctx := context.Background()
+func StartServer(ctx context.Context, mgr manager.Manager) {
 	_ = log.FromContext(ctx)
 
 	server := getMetricsServer(mgr)
+
+	go run(ctx, *server)
+
+}
+
+func run(ctx context.Context, server MetricsServer) {
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 

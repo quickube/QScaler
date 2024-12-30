@@ -18,14 +18,6 @@ type MetricsServer struct {
 	Scheme   *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/finalizers,verbs=update
-
 func (s *MetricsServer) Run(ctx context.Context) error {
 	log.Log.Info("Starting QScaler Metrics Server")
 	err := s.Sync(ctx)
@@ -46,18 +38,21 @@ func (s *MetricsServer) Run(ctx context.Context) error {
 
 		var scalerConfig v1alpha1.ScalerConfig
 		namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
-		if err := s.client.Get(ctx, namespacedName, &scalerConfig); err != nil {
-			log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
+		if err = s.client.Get(ctx, namespacedName, &scalerConfig); err != nil {
+			log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName)
+			return err
 		}
 
 		BrokerClient, err := brokers.GetBroker(req.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
 		if err != nil {
 			log.Log.Error(err, "Failed to create broker client")
+			return err
 		}
 
 		QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
 		if err != nil {
 			log.Log.Error(err, "Failed to get queue length")
+			return err
 		}
 		log.Log.Info(fmt.Sprintf("current queue length: %d", QueueLength))
 
@@ -69,14 +64,11 @@ func (s *MetricsServer) Run(ctx context.Context) error {
 
 		if err := s.client.Status().Update(ctx, &qworker); err != nil {
 			log.Log.Error(err, "Failed to update QWorker status")
+			return err
 		}
 	}
 	return nil
 }
-
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 
 func (s *MetricsServer) Sync(ctx context.Context) error {
 	_ = log.FromContext(ctx)

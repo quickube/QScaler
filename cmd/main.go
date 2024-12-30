@@ -19,11 +19,11 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"github.com/quickube/QScaler/internal/metrics"
 	"os"
 
 	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/controller"
-	"github.com/quickube/QScaler/internal/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -159,7 +159,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	go metrics.StartServer(mgr)
 	// +kubebuilder:scaffold:builder
 
 	if err = mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -172,8 +171,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+	metrics.StartServer(ctx, mgr)
+
 	setupLog.Info("starting manager")
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
