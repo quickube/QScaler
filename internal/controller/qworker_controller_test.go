@@ -187,7 +187,7 @@ var _ = Describe("QWorker Controller", func() {
 
 			// Verify desired replicas match Pod count
 			Expect(k8sClient.Get(ctx, ctrlclient.ObjectKeyFromObject(qworkerResource), qworkerResource)).To(Succeed())
-			Expect(len(ownedPods)).To(Equal(qworkerResource.Status.DesiredReplicas))
+			Expect(ownedPods).To(HaveLen(qworkerResource.Status.DesiredReplicas))
 
 			// Cleanup resources
 			Expect(k8sManager.GetClient().Delete(ctx, qworkerResource)).To(Succeed())

@@ -3,7 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/mock"
+
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -11,6 +11,7 @@ import (
 	v1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	"github.com/quickube/QScaler/internal/mocks"
+	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,7 +69,7 @@ var _ = Describe("ScalerConfigReconciler", func() {
 			// Verify broker exists
 			broker, err := brokers.GetBroker("default", scalerConfigName)
 			Expect(broker).ToNot(BeNil(), "expected broker to be non-nil")
-			Expect(err).To(BeNil(), "expected no error when retrieving broker")
+			Expect(err).ToNot(HaveOccurred(), "expected no error when retrieving broker")
 
 			// Verify status update using Eventually
 			updated := &v1alpha1.ScalerConfig{}
