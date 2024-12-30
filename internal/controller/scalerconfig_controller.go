@@ -100,6 +100,7 @@ func (r *ScalerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ScalerConfigReconciler) updateScalerHealth(ctx *context.Context, scalerConfig *v1alpha1.ScalerConfig, health bool) error {
 	scalerConfig.Status.Healthy = health
+	log.Log.Info("Updating ScalerConfig", "name", scalerConfig.Name, "health", scalerConfig.Status.Healthy)
 	if err := r.Status().Update(*ctx, scalerConfig); err != nil {
 		log.Log.Error(err, "Failed to update scalerConfig status", "name", scalerConfig.Name)
 		return err

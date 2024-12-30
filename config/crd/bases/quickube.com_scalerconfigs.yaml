@@ -87,6 +87,8 @@ spec:
             properties:
               healthy:
                 type: boolean
+            required:
+            - healthy
             type: object
         required:
         - spec

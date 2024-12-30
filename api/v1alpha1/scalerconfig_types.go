@@ -52,7 +52,7 @@ type ValueOrSecret struct {
 }
 
 type ScalerConfigStatus struct {
-	Healthy bool `json:"healthy,omitempty"`
+	Healthy bool `json:"healthy"`
 }
 
 // +kubebuilder:object:root=true
