@@ -93,7 +93,7 @@ rules:
       - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   labels:
     {{- include "qscaler.labels" . | nindent 4 }}
@@ -104,6 +104,14 @@ rules:
     resources:
       - qworkers
       - scalerconfigs
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - quickube.com
+    resources:
       - pods
     verbs:
       - get
@@ -142,14 +150,14 @@ subjects:
     namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   labels:
     {{- include "qscaler.labels" . | nindent 4 }}
   name: {{ include "qscaler.fullname" . }}-qworker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: {{ include "qscaler.fullname" . }}-qworker
 subjects:
   - kind: ServiceAccount
