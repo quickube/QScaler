@@ -26,8 +26,7 @@ func getMetricsServer(mgr manager.Manager) *MetricsServer {
 	return metricsServerInstance
 }
 
-func StartServer(mgr manager.Manager) {
-	ctx := context.Background()
+func StartServer(mgr manager.Manager, ctx context.Context) {
 	_ = log.FromContext(ctx)
 
 	server := getMetricsServer(mgr)

@@ -18,14 +18,6 @@ type MetricsServer struct {
 	Scheme   *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
-
-// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=scalerconfigs/finalizers,verbs=update
-
 func (s *MetricsServer) Run(ctx context.Context) error {
 	log.Log.Info("Starting QScaler Metrics Server")
 	err := s.Sync(ctx)
@@ -73,10 +65,6 @@ func (s *MetricsServer) Run(ctx context.Context) error {
 	}
 	return nil
 }
-
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers,verbs=get;list;watch;create;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 
 func (s *MetricsServer) Sync(ctx context.Context) error {
 	_ = log.FromContext(ctx)

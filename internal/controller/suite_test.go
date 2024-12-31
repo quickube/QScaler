@@ -103,7 +103,7 @@ var _ = BeforeSuite(func() {
 	}
 	Expect(reconciler.SetupWithManager(k8sManager)).To(Succeed())
 
-	go metrics.StartServer(k8sManager)
+	go metrics.StartServer(k8sManager, ctx)
 
 	By("Initializing the ScalerConfigReconciler")
 	reconciler2 = &ScalerConfigReconciler{
