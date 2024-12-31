@@ -109,6 +109,13 @@ rules:
       - get
       - list
   - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+  - apiGroups:
       - quickube.com
     resources:
       - pods
