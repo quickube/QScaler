@@ -173,7 +173,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	go metrics.StartServer(mgr, ctx)
+	metrics.StartServer(ctx, mgr)
 
 	setupLog.Info("starting manager")
 	if err = mgr.Start(ctx); err != nil {
