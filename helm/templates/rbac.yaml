@@ -104,7 +104,6 @@ rules:
     resources:
       - qworkers
       - scalerconfigs
-      - secrets
     verbs:
       - get
       - list
@@ -166,6 +165,6 @@ roleRef:
   name: {{ include "qscaler.fullname" . }}-qworker
 subjects:
   - kind: ServiceAccount
-    name: qworker
+    name: {{ include "qscaler.workerServiceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 
