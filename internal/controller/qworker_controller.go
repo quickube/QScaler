@@ -127,6 +127,13 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 		Spec: qWorker.Spec.PodSpec,
 	}
 
+	for _, container := range workerPod.Spec.Containers {
+		container.Env = append(container.Env, corev1.EnvVar{
+			Name:  "QWORKER_NAME",
+			Value: qWorker.Name,
+		})
+	}
+
 	// Set QWorker as the owner of the Pod
 	if err := controllerutil.SetControllerReference(qWorker, workerPod, r.Scheme); err != nil {
 		return err
