@@ -64,6 +64,14 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	currentPodCount := len(podList.Items)
 	qworker.Status.CurrentReplicas = currentPodCount
 
+	// Generate the hash for the pod template
+	podTemplateHash, err := GeneratePodTemplateHash(qworker.Spec.PodSpec)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	qworker.Status.CurrentPodSpecHash = podTemplateHash
+
 	if err := r.Status().Update(ctx, qworker); err != nil {
 		log.Log.Error(err, fmt.Sprintf("Failed to update QWorker status %s", qworker.Name))
 		return ctrl.Result{}, err
@@ -127,11 +135,15 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 		Spec: qWorker.Spec.PodSpec,
 	}
 
-	for _, container := range workerPod.Spec.Containers {
-		container.Env = append(container.Env, corev1.EnvVar{
+	for i, container := range workerPod.Spec.Containers {
+		workerPod.Spec.Containers[i].Env = append(container.Env, corev1.EnvVar{
 			Name:  "QWORKER_NAME",
 			Value: qWorker.Name,
-		})
+		},
+			corev1.EnvVar{
+				Name:  "POD_SPEC_HASH",
+				Value: qWorker.Status.CurrentPodSpecHash,
+			})
 	}
 
 	// Set QWorker as the owner of the Pod

@@ -27,8 +27,9 @@ type QWorkerSpec struct {
 }
 
 type QWorkerStatus struct {
-	CurrentReplicas int `json:"currentReplicas"`
-	DesiredReplicas int `json:"desiredReplicas"`
+	CurrentReplicas    int    `json:"currentReplicas"`
+	DesiredReplicas    int    `json:"desiredReplicas"`
+	CurrentPodSpecHash string `json:"currentPodSpecHash"`
 }
 
 type QWorkerScaleConfig struct {

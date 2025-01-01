@@ -7902,11 +7902,14 @@ spec:
             type: object
           status:
             properties:
+              currentPodSpecHash:
+                type: string
               currentReplicas:
                 type: integer
               desiredReplicas:
                 type: integer
             required:
+            - currentPodSpecHash
             - currentReplicas
             - desiredReplicas
             type: object
