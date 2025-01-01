@@ -60,3 +60,10 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create the name of the worker service account to use
+*/}}
+{{- define "qscaler.workerServiceAccountName" -}}
+{{- printf "%s-worker" (include "qscaler.serviceAccountName" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
