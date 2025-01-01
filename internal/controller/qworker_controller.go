@@ -72,7 +72,7 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	qworker.Status.CurrentPodSpecHash = podTemplateHash
 
-	if err := r.Status().Update(ctx, qworker); err != nil {
+	if err = r.Status().Update(ctx, qworker); err != nil {
 		log.Log.Error(err, fmt.Sprintf("Failed to update QWorker status %s", qworker.Name))
 		return ctrl.Result{}, err
 	}
@@ -102,14 +102,14 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		if diffAmount > 0 {
 			for range diffAmount {
-				if err := r.StartWorker(&ctx, qworker); err != nil {
+				if err = r.StartWorker(&ctx, qworker); err != nil {
 					return ctrl.Result{}, err
 				}
 			}
 
 		} else if diffAmount < 0 {
 			for range diffAmount * -1 {
-				if err := r.RemoveWorker(&ctx, qworker); err != nil {
+				if err = r.RemoveWorker(&ctx, qworker); err != nil {
 					return ctrl.Result{}, err
 				}
 			}
@@ -117,15 +117,15 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %d", qworker.Name, qworker.Status.CurrentReplicas))
-	if err := r.Status().Update(ctx, qworker); err != nil {
+	if err = r.Status().Update(ctx, qworker); err != nil {
 		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, nil
 }
 
 func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.QWorker) error {
-	log.Log.Info("Starting worker", "name", qWorker.Name)
 	podId := fmt.Sprintf("%s-%s", qWorker.ObjectMeta.Name, uuid.New().String())
+	log.Log.Info("Starting worker", "name", podId)
 	workerPod := &corev1.Pod{
 
 		ObjectMeta: metav1.ObjectMeta{
