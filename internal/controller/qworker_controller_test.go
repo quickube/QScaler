@@ -33,13 +33,16 @@ import (
 )
 
 var _ = Describe("QWorker Controller", func() {
+	var (
+		namespace = "default"
+	)
+
 	Context("Reconciliation logic", func() {
 		It("should reconcile successfully and update QWorker status", func() {
 			// Unique test identifiers
 			testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
 			resourceName := fmt.Sprintf("qworker-%s", testID)
 			scalerConfigName := fmt.Sprintf("scalerconfig-%s", testID)
-			namespace := "default"
 			configKey := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 
 			// Mock Broker
@@ -109,7 +112,6 @@ var _ = Describe("QWorker Controller", func() {
 			testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
 			resourceName := fmt.Sprintf("qworker-%s", testID)
 			scalerConfigName := fmt.Sprintf("scalerconfig-%s", testID)
-			namespace := "default"
 			configKey := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 
 			// Mock Broker
@@ -201,7 +203,6 @@ var _ = Describe("QWorker Controller", func() {
 			testID := fmt.Sprintf("test-%d", time.Now().UnixNano())
 			resourceName := fmt.Sprintf("qworker-%s", testID)
 			scalerConfigName := fmt.Sprintf("scalerconfig-%s", testID)
-			namespace := "default"
 			configKey := fmt.Sprintf("%s/%s", namespace, scalerConfigName)
 
 			// Mock Broker

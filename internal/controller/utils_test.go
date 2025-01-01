@@ -1,12 +1,14 @@
 package controller
 
 import (
+	"reflect"
+	"testing"
+
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+
 	corev1 "k8s.io/api/core/v1"
-	"reflect"
-	"testing"
 )
 
 // TestGeneratePodTemplateHash tests the GeneratePodTemplateHash function
