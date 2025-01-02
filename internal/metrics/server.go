@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type MetricsServer struct {
@@ -20,34 +19,33 @@ type MetricsServer struct {
 
 func (s *MetricsServer) Run(ctx context.Context) error {
 	log.Log.Info("Starting QScaler Metrics Server")
-	err := s.Sync(ctx)
+
+	var BrokerClient brokers.Broker
+	var QueueLength int
+	var err error
+
+	err = s.Sync(ctx)
 	if err != nil {
 		return err
 	}
+
 	if len(s.qworkers.Items) == 0 {
 		log.Log.Info("No qworkers found!")
 		return nil
 	}
 	for _, qworker := range s.qworkers.Items {
-		req := reconcile.Request{
-			NamespacedName: client.ObjectKey{
-				Namespace: qworker.Namespace,
-				Name:      qworker.Name,
-			},
-		}
-
 		var scalerConfig v1alpha1.ScalerConfig
 		namespacedName := client.ObjectKey{Name: qworker.Spec.ScaleConfig.ScalerConfigRef, Namespace: qworker.ObjectMeta.Namespace}
-		if err := s.client.Get(ctx, namespacedName, &scalerConfig); err != nil {
+		if err = s.client.Get(ctx, namespacedName, &scalerConfig); err != nil {
 			log.Log.Error(err, "Failed to get ScalerConfig", "namespacedName", namespacedName.String())
 		}
 
-		BrokerClient, err := brokers.GetBroker(req.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
+		BrokerClient, err = brokers.NewBroker(&scalerConfig)
 		if err != nil {
 			log.Log.Error(err, "Failed to create broker client")
 		}
 
-		QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
+		QueueLength, err = BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
 		if err != nil {
 			log.Log.Error(err, "Failed to get queue length")
 		}
@@ -59,7 +57,7 @@ func (s *MetricsServer) Run(ctx context.Context) error {
 		log.Log.Info(fmt.Sprintf("desired amount: %d", desiredPodsAmount))
 		qworker.Status.DesiredReplicas = desiredPodsAmount
 
-		if err := s.client.Status().Update(ctx, &qworker); err != nil {
+		if err = s.client.Status().Update(ctx, &qworker); err != nil {
 			log.Log.Error(err, "Failed to update QWorker status")
 		}
 	}
