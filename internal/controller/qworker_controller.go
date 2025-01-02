@@ -65,12 +65,12 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	qworker.Status.CurrentReplicas = currentPodCount
 
 	// Generate the hash for the pod template
-	podTemplateHash, err := GeneratePodTemplateHash(qworker.Spec.PodSpec)
+	podSpecHash, err := GeneratePodSpecHash(qworker.Spec.PodSpec)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	qworker.Status.CurrentPodSpecHash = podTemplateHash
+	qworker.Status.CurrentPodSpecHash = podSpecHash
 
 	if err = r.Status().Update(ctx, qworker); err != nil {
 		log.Log.Error(err, fmt.Sprintf("Failed to update QWorker status %s", qworker.Name))

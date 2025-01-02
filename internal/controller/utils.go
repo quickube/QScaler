@@ -9,8 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
-// GeneratePodTemplateHash generates a deterministic hash for a pod template
-func GeneratePodTemplateHash(podSpec corev1.PodSpec) (string, error) {
+// GeneratePodSpecHash generates a deterministic hash for a pod template
+func GeneratePodSpecHash(podSpec corev1.PodSpec) (string, error) {
 	// Serialize the pod spec to JSON
 	podSpecBytes, err := json.Marshal(podSpec)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// TestGeneratePodTemplateHash tests the GeneratePodTemplateHash function
+// TestGeneratePodTemplateHash tests the GeneratePodSpecHash function
 func TestGeneratePodTemplateHash(t *testing.T) {
 	// Define a sample PodSpec for testing
 	podSpec := corev1.PodSpec{
@@ -36,9 +36,9 @@ func TestGeneratePodTemplateHash(t *testing.T) {
 	expectedHashString := hex.EncodeToString(expectedHash[:])
 
 	// Call the function under test
-	actualHash, err := GeneratePodTemplateHash(podSpec)
+	actualHash, err := GeneratePodSpecHash(podSpec)
 	if err != nil {
-		t.Fatalf("GeneratePodTemplateHash returned an error: %v", err)
+		t.Fatalf("GeneratePodSpecHash returned an error: %v", err)
 	}
 
 	// Verify the result
@@ -62,21 +62,21 @@ func TestGeneratePodTemplateHash_Deterministic(t *testing.T) {
 		},
 	}
 
-	// Run GeneratePodTemplateHash twice with the same input
-	hash1, err1 := GeneratePodTemplateHash(podSpec)
-	hash2, err2 := GeneratePodTemplateHash(podSpec)
+	// Run GeneratePodSpecHash twice with the same input
+	hash1, err1 := GeneratePodSpecHash(podSpec)
+	hash2, err2 := GeneratePodSpecHash(podSpec)
 
 	// Assert no errors
 	if err1 != nil {
-		t.Fatalf("First call to GeneratePodTemplateHash() returned error: %v", err1)
+		t.Fatalf("First call to GeneratePodSpecHash() returned error: %v", err1)
 	}
 	if err2 != nil {
-		t.Fatalf("Second call to GeneratePodTemplateHash() returned error: %v", err2)
+		t.Fatalf("Second call to GeneratePodSpecHash() returned error: %v", err2)
 	}
 
 	// Assert the hashes are equal
 	if hash1 != hash2 {
-		t.Errorf("GeneratePodTemplateHash() returned different results: hash1 = %v, hash2 = %v", hash1, hash2)
+		t.Errorf("GeneratePodSpecHash() returned different results: hash1 = %v, hash2 = %v", hash1, hash2)
 	} else {
 		t.Logf("Hashes match: %v", hash1)
 	}
