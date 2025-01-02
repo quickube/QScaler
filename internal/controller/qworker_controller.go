@@ -77,25 +77,6 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	BrokerClient, err := brokers.GetBroker(req.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
-	if err != nil {
-		log.Log.Error(err, "Failed to get broker client")
-		return ctrl.Result{}, err
-	}
-
-	QueueLength, err := BrokerClient.GetQueueLength(&ctx, qworker.Spec.ScaleConfig.Queue)
-	if err != nil {
-		log.Log.Error(err, "Failed to get queue length")
-		return ctrl.Result{}, err
-	}
-	log.Log.Info(fmt.Sprintf("current queue length: %d", QueueLength))
-
-	desiredPodsAmount := min(
-		max(QueueLength*qworker.Spec.ScaleConfig.ScalingFactor, qworker.Spec.ScaleConfig.MinReplicas),
-		qworker.Spec.ScaleConfig.MaxReplicas)
-	log.Log.Info(fmt.Sprintf("QWorker %s desired amount: %d", qworker.Name, desiredPodsAmount))
-	qworker.Status.DesiredReplicas = desiredPodsAmount
-
 	diffAmount := qworker.Status.DesiredReplicas - qworker.Status.CurrentReplicas
 	if diffAmount != 0 {
 		log.Log.Info(fmt.Sprintf("scaling horizontally %s from %d to %d", qworker.Name, qworker.Status.CurrentReplicas, qworker.Status.DesiredReplicas))

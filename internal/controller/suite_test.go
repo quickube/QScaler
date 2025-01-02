@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	quickcubecomv1alpha1 "github.com/quickube/QScaler/api/v1alpha1"
+	"github.com/quickube/QScaler/internal/metrics"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -101,6 +102,8 @@ var _ = BeforeSuite(func() {
 		Scheme: k8sManager.GetScheme(),
 	}
 	Expect(reconciler.SetupWithManager(k8sManager)).To(Succeed())
+
+	metrics.StartServer(ctx, k8sManager)
 
 	By("Initializing the ScalerConfigReconciler")
 	reconciler2 = &ScalerConfigReconciler{
