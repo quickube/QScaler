@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quickube/QScaler/api/v1alpha1"
-	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,12 +88,6 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				}
 			}
 
-		} else if diffAmount < 0 {
-			for range diffAmount * -1 {
-				if err = r.RemoveWorker(&ctx, qworker); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
 		}
 	}
 
@@ -150,22 +143,6 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 		return err
 	}
 	qWorker.Status.CurrentReplicas += 1
-	return nil
-}
-func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1.QWorker) error {
-
-	BrokerClient, err := brokers.GetBroker(qworker.ObjectMeta.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
-	if err != nil {
-		log.Log.Error(err, "Failed to get broker client")
-		return err
-	}
-
-	err = BrokerClient.KillQueue(ctx, qworker.Spec.ScaleConfig.Queue)
-	if err != nil {
-		log.Log.Error(err, "unable to kill queue")
-		return err
-	}
-	qworker.Status.CurrentReplicas -= 1
 	return nil
 }
 

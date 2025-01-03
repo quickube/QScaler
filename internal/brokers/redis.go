@@ -2,14 +2,12 @@ package brokers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/mitchellh/mapstructure"
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/secret_manager"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type RedisBroker struct {
@@ -20,16 +18,6 @@ type RedisConfig struct {
 	Host     string                 `yaml:"host"`
 	Port     string                 `yaml:"port"`
 	Password v1alpha1.ValueOrSecret `yaml:"password"`
-}
-
-func (r *RedisBroker) KillQueue(ctx *context.Context, topic string) error {
-	status := r.client.LPush(*ctx, r.GetDeathQueue(topic), "{'kill': 'true'}")
-	if status.String() == "error" {
-		return errors.New(status.String())
-	}
-	log.Log.Info(fmt.Sprintf("published message to death queue: %s", status))
-
-	return nil
 }
 
 func (r *RedisBroker) GetQueueLength(ctx *context.Context, topic string) (int, error) {
