@@ -3,6 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
+
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
@@ -111,7 +112,7 @@ func (s *MetricsServer) RightSizeContainers(ctx context.Context, qworker *v1alph
 			if err != nil {
 				return err
 			}
-			for i, _ := range podMetrics.Containers {
+			for i := range podMetrics.Containers {
 				// CPU usage
 				cpu := podMetrics.Containers[i].Usage.Cpu()
 				if exceedsThreshold(containerMaxCpuUsage, *cpu, thresholdPercent) {
