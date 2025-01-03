@@ -120,7 +120,7 @@ helm: manifests
 	helm template ./helm --debug > _lint.yaml
 
 mocks:
-	mockery --all
+	mockery --all --output ./internal/mocks
 
 
 .PHONY: test
