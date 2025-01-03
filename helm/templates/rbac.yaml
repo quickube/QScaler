@@ -115,13 +115,14 @@ rules:
       - get
       - list
   - apiGroups:
-      - quickube.com
+      - ""
     resources:
       - pods
     verbs:
       - get
       - patch
       - list
+      - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
