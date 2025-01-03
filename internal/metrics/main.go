@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"sync"
 	"time"
 
@@ -17,10 +18,16 @@ var (
 
 func getMetricsServer(mgr manager.Manager) *MetricsServer {
 	once.Do(func() {
+		// Create a metrics client
+		metricsClient, err := metricsv1beta1.NewForConfig(mgr.GetConfig())
+		if err != nil {
+			log.Log.Error(err, "error creating metrics client")
+		}
 		metricsServerInstance = &MetricsServer{
-			client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			qworkers: &v1alpha1.QWorkerList{},
+			client:        mgr.GetClient(),
+			Scheme:        mgr.GetScheme(),
+			metricsClient: metricsClient,
+			qworkers:      &v1alpha1.QWorkerList{},
 		}
 	})
 	return metricsServerInstance

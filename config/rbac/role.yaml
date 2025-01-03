@@ -22,6 +22,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - metrics.k8s.io
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - quickube.com
   resources:
   - qworkers

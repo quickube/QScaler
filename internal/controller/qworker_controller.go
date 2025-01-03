@@ -45,6 +45,7 @@ type QWorkerReconciler struct {
 // +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="metrics.k8s.io",resources=pods,verbs=get;list;watch
 
 func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
@@ -125,6 +126,18 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 				Name:  "POD_SPEC_HASH",
 				Value: qWorker.Status.CurrentPodSpecHash,
 			})
+
+		if qWorker.Spec.ScaleConfig.ActivateVPA &&
+			len(qWorker.Status.MaxContainerResourcesUsage) != 0 {
+			log.Log.Info(fmt.Sprintf("setting worker %s container number %d with %s cpu and %s memory",
+				qWorker.Name,
+				i,
+				qWorker.Status.MaxContainerResourcesUsage[i].Cpu().String(),
+				qWorker.Status.MaxContainerResourcesUsage[i].Memory().String(),
+			))
+			workerPod.Spec.Containers[i].Resources.Requests = qWorker.Status.MaxContainerResourcesUsage[i]
+		}
+
 	}
 
 	// Set QWorker as the owner of the Pod

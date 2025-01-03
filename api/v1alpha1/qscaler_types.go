@@ -30,6 +30,8 @@ type QWorkerStatus struct {
 	CurrentReplicas    int    `json:"currentReplicas"`
 	DesiredReplicas    int    `json:"desiredReplicas"`
 	CurrentPodSpecHash string `json:"currentPodSpecHash"`
+	// +kubebuilder:default={}
+	MaxContainerResourcesUsage []corev1.ResourceList `json:"maxContainerResourcesUsage"`
 }
 
 type QWorkerScaleConfig struct {
@@ -38,6 +40,8 @@ type QWorkerScaleConfig struct {
 	MinReplicas     int    `json:"minReplicas"`
 	MaxReplicas     int    `json:"maxReplicas"`
 	ScalingFactor   int    `json:"scalingFactor"`
+	// +kubebuilder:default=false
+	ActivateVPA bool `json:"activateVPA"`
 }
 
 // +kubebuilder:object:root=true
