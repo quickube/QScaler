@@ -78,17 +78,15 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	diffAmount := qworker.Status.DesiredReplicas - qworker.Status.CurrentReplicas
-	if diffAmount != 0 {
+
+	if diffAmount > 0 {
 		log.Log.Info(fmt.Sprintf("scaling horizontally %s from %d to %d", qworker.Name, qworker.Status.CurrentReplicas, qworker.Status.DesiredReplicas))
-
-		if diffAmount > 0 {
-			for range diffAmount {
-				if err = r.StartWorker(&ctx, qworker); err != nil {
-					return ctrl.Result{}, err
-				}
+		for range diffAmount {
+			if err = r.StartWorker(&ctx, qworker); err != nil {
+				return ctrl.Result{}, err
 			}
-
 		}
+
 	}
 
 	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %d", qworker.Name, qworker.Status.CurrentReplicas))
