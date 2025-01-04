@@ -13,24 +13,6 @@ type Broker struct {
 	mock.Mock
 }
 
-// GetDeathQueue provides a mock function with given fields: topic
-func (_m *Broker) GetDeathQueue(topic string) string {
-	ret := _m.Called(topic)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetDeathQueue")
-	}
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func(string) string); ok {
-		r0 = rf(topic)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
 // GetQueueLength provides a mock function with given fields: ctx, topic
 func (_m *Broker) GetQueueLength(ctx *context.Context, topic string) (int, error) {
 	ret := _m.Called(ctx, topic)

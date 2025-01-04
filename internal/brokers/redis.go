@@ -33,10 +33,6 @@ func (r *RedisBroker) IsConnected(ctx *context.Context) (bool, error) {
 	return status.Err() == nil, status.Err()
 }
 
-func (r *RedisBroker) GetDeathQueue(topic string) string {
-	return fmt.Sprintf("death-%s", topic)
-}
-
 func NewRedisClient(config *v1alpha1.ScalerConfig) (*RedisBroker, error) {
 	redisConfig := &RedisConfig{}
 	err := mapstructure.Decode(config.Spec.Config.RedisConfig, &redisConfig)
