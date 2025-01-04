@@ -24,7 +24,7 @@ type MetricsServer struct {
 	client        client.Client
 	qworkers      *v1alpha1.QWorkerList
 	Scheme        *runtime.Scheme
-	metricsClient *metricsv1beta1client.MetricsV1beta1Client
+	metricsClient metricsv1beta1client.MetricsV1beta1Interface
 }
 
 func (s *MetricsServer) Run(ctx context.Context) error {
@@ -96,7 +96,7 @@ func (s *MetricsServer) RightSizeContainers(ctx context.Context, qworker *v1alph
 
 	numberOfContainersPerPod := len(podList.Items[0].Spec.Containers)
 	for container := 0; container < numberOfContainersPerPod; container++ {
-		if len(qworker.Status.MaxContainerResourcesUsage) <= 0 {
+		if len(qworker.Status.MaxContainerResourcesUsage) == 0 {
 			qworker.Status.MaxContainerResourcesUsage =
 				append(qworker.Status.MaxContainerResourcesUsage, corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("0"),
