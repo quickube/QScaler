@@ -1,4 +1,4 @@
-site_name: QScaler - Kubernetes-native queue worker autoscaler.
+site_name: QScaler
 site_description: 'QScaler - Kubernetes-native queue worker autoscaler'
 site_author: 'Quickube'
 docs_dir: docs/
@@ -30,7 +30,7 @@ markdown_extensions:
 nav:
   - Introduction: introduction.md
   - Getting Started:
-    - Installation: getting_started/installation.md
+    - Installation: getting_started/index.md
     - Setup Broker: getting_started/setup.md
   - Concepts:
       - Qworker: concepts/qworker.md
