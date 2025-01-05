@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/quickube/QScaler/api/v1alpha1"
-	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,6 +44,7 @@ type QWorkerReconciler struct {
 // +kubebuilder:rbac:groups=quickube.com,resources=qworkers/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="metrics.k8s.io",resources=pods,verbs=get;list;watch
 
 func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
@@ -78,23 +78,15 @@ func (r *QWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	diffAmount := qworker.Status.DesiredReplicas - qworker.Status.CurrentReplicas
-	if diffAmount != 0 {
+
+	if diffAmount > 0 {
 		log.Log.Info(fmt.Sprintf("scaling horizontally %s from %d to %d", qworker.Name, qworker.Status.CurrentReplicas, qworker.Status.DesiredReplicas))
-
-		if diffAmount > 0 {
-			for range diffAmount {
-				if err = r.StartWorker(&ctx, qworker); err != nil {
-					return ctrl.Result{}, err
-				}
-			}
-
-		} else if diffAmount < 0 {
-			for range diffAmount * -1 {
-				if err = r.RemoveWorker(&ctx, qworker); err != nil {
-					return ctrl.Result{}, err
-				}
+		for range diffAmount {
+			if err = r.StartWorker(&ctx, qworker); err != nil {
+				return ctrl.Result{}, err
 			}
 		}
+
 	}
 
 	log.Log.Info(fmt.Sprintf("Qworker %s replica count is %d", qworker.Name, qworker.Status.CurrentReplicas))
@@ -125,6 +117,18 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 				Name:  "POD_SPEC_HASH",
 				Value: qWorker.Status.CurrentPodSpecHash,
 			})
+
+		if qWorker.Spec.ScaleConfig.ActivateVPA &&
+			len(qWorker.Status.MaxContainerResourcesUsage) != 0 {
+			log.Log.Info(fmt.Sprintf("setting worker %s container number %d with %s cpu and %s memory",
+				qWorker.Name,
+				i,
+				qWorker.Status.MaxContainerResourcesUsage[i].Cpu().String(),
+				qWorker.Status.MaxContainerResourcesUsage[i].Memory().String(),
+			))
+			workerPod.Spec.Containers[i].Resources.Requests = qWorker.Status.MaxContainerResourcesUsage[i]
+		}
+
 	}
 
 	// Set QWorker as the owner of the Pod
@@ -137,22 +141,6 @@ func (r *QWorkerReconciler) StartWorker(ctx *context.Context, qWorker *v1alpha1.
 		return err
 	}
 	qWorker.Status.CurrentReplicas += 1
-	return nil
-}
-func (r *QWorkerReconciler) RemoveWorker(ctx *context.Context, qworker *v1alpha1.QWorker) error {
-
-	BrokerClient, err := brokers.GetBroker(qworker.ObjectMeta.Namespace, qworker.Spec.ScaleConfig.ScalerConfigRef)
-	if err != nil {
-		log.Log.Error(err, "Failed to get broker client")
-		return err
-	}
-
-	err = BrokerClient.KillQueue(ctx, qworker.Spec.ScaleConfig.Queue)
-	if err != nil {
-		log.Log.Error(err, "unable to kill queue")
-		return err
-	}
-	qworker.Status.CurrentReplicas -= 1
 	return nil
 }
 

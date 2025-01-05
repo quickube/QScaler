@@ -64,7 +64,12 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 	$(GOLANGCI_LINT) run --fix
 
 .PHONY: deploy
-deploy: init-kind init-redis local-build local-push manifests init-qscaler
+deploy: init-kind init-metrics-server init-redis local-build local-push manifests init-qscaler
+
+.PHONY: init-metrics-server
+init-metrics-server:
+	sh ./hack/init-metrics-srever.sh
+
 
 .PHONY: clean
 clean:
@@ -115,7 +120,7 @@ helm: manifests
 	helm template ./helm --debug > _lint.yaml
 
 mocks:
-	mockery --all
+	mockery --all --output ./internal/mocks
 
 
 .PHONY: test
