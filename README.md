@@ -17,7 +17,7 @@ Current queue-based HPA systems are not optimal for managing queue-based workers
 
 ### Horizontal Pod Autoscaling (HPA)
 * **Scaling Up**: QScaler monitors the queue's rate and length. When increased workload is detected, it scales up worker pods accordingly.
-* **Scaling Down**: To prevent disrupting active tasks, QScaler sends a SIGKILL_QUEUE message via the queue system. Workers receive this message and, after completing current tasks, terminate themselves before taking on new ones.
+* **Scaling Down**: Instead of terminating pods immediately, QScaler leverages a custom resource definition (CRD) called QWorker. Workers evaluate their own state, complete in-progress tasks, and gracefully terminate themselves when scaling down is required. This ensures no tasks are interrupted or re-queued.
 
 ### Vertical Pod Autoscaling (VPA)
 * **Resource Adjustment**: QScaler observes resource utilization and adjusts pod resource requests and limits. It ensures pods have sufficient resources based on historical maximum usage and reacts to OOM events by allocating more resources.
