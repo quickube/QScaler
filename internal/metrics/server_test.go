@@ -9,6 +9,7 @@ import (
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	"github.com/quickube/QScaler/internal/mocks"
+	assertion "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -227,16 +228,24 @@ func TestExceedsThreshold(t *testing.T) {
 }
 
 func TestRightSizeContainers(t *testing.T) {
+	assert := assertion.New(t)
 	tests := []struct {
-		name          string
-		qworker       *v1alpha1.QWorker
-		podList       []ctrlclient.Object
-		metricsData   map[string]*metricsv1beta1.PodMetrics
-		expectedError bool
+		name            string
+		qworker         *v1alpha1.QWorker
+		expectedQworker *v1alpha1.QWorker
+		podList         []ctrlclient.Object
+		metricsData     map[string]*metricsv1beta1.PodMetrics
+		expectedError   bool
 	}{
 		{
 			name: "No pods found",
 			qworker: &v1alpha1.QWorker{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-qworker",
+				},
+			},
+			expectedQworker: &v1alpha1.QWorker{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test-namespace",
 					Name:      "test-qworker",
@@ -258,6 +267,20 @@ func TestRightSizeContainers(t *testing.T) {
 						{
 							corev1.ResourceCPU:    resource.MustParse("500m"),
 							corev1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			},
+			expectedQworker: &v1alpha1.QWorker{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-qworker",
+				},
+				Status: v1alpha1.QWorkerStatus{
+					MaxContainerResourcesUsage: []corev1.ResourceList{
+						{
+							corev1.ResourceCPU:    resource.MustParse("600m"),
+							corev1.ResourceMemory: resource.MustParse("1Gi"),
 						},
 					},
 				},
@@ -320,7 +343,7 @@ func TestRightSizeContainers(t *testing.T) {
 			client := clientBuilder.Build()
 
 			// Create fake metrics client with reactors
-			metricsFakeClient := fake2.NewSimpleClientset()
+			metricsFakeClient := fake2.Clientset{}
 			metricsClient := metricsFakeClient.MetricsV1beta1()
 			metricsFakeClient.PrependReactor("get", "podmetrics", func(action k8stesting.Action) (bool, runtime.Object, error) {
 				getAction := action.(k8stesting.GetAction)
@@ -336,9 +359,16 @@ func TestRightSizeContainers(t *testing.T) {
 			}
 
 			err := s.RightSizeContainers(ctx, tt.qworker)
-			if (err != nil) != tt.expectedError {
-				t.Errorf("expected error: %v, got: %v", tt.expectedError, err)
+			assert.Equal(tt.expectedError, err != nil)
+
+			if len(tt.metricsData) > 0 {
+				// assert if not equal
+				assert.False(tt.qworker.Status.MaxContainerResourcesUsage[0].Cpu().
+					Equal(*tt.expectedQworker.Status.MaxContainerResourcesUsage[0].Cpu()))
+				assert.False(tt.qworker.Status.MaxContainerResourcesUsage[0].Memory().
+					Equal(*tt.expectedQworker.Status.MaxContainerResourcesUsage[0].Memory()))
 			}
+
 		})
 	}
 }
