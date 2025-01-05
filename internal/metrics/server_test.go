@@ -11,8 +11,12 @@ import (
 	"github.com/quickube/QScaler/internal/mocks"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	k8stesting "k8s.io/client-go/testing"
+	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	fake2 "k8s.io/metrics/pkg/client/clientset/versioned/fake"
 	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -147,5 +151,194 @@ func TestMetricsServer_Run(t *testing.T) {
 
 	if updatedQWorker.Status.DesiredReplicas != 10 {
 		t.Errorf("Expected desired replicas to be 10, got %d", updatedQWorker.Status.DesiredReplicas)
+	}
+}
+
+func TestExceedsThreshold(t *testing.T) {
+	tests := []struct {
+		name             string
+		current          string
+		new              string
+		thresholdPercent float64
+		expected         bool
+	}{
+		{
+			name:             "New value exceeds threshold",
+			current:          "100m",
+			new:              "150m",
+			thresholdPercent: 40.0,
+			expected:         true,
+		},
+		{
+			name:             "New value does not exceed threshold",
+			current:          "100m",
+			new:              "120m",
+			thresholdPercent: 40.0,
+			expected:         false,
+		},
+		{
+			name:             "Current value is zero and new value is non-zero",
+			current:          "0",
+			new:              "100m",
+			thresholdPercent: 50.0,
+			expected:         true,
+		},
+		{
+			name:             "Current value and new value are both zero",
+			current:          "0",
+			new:              "0",
+			thresholdPercent: 50.0,
+			expected:         false,
+		},
+		{
+			name:             "New value is less than current value",
+			current:          "200m",
+			new:              "100m",
+			thresholdPercent: 50.0,
+			expected:         false,
+		},
+		{
+			name:             "Threshold is zero, any increase should exceed",
+			current:          "100m",
+			new:              "110m",
+			thresholdPercent: 0.0,
+			expected:         true,
+		},
+		{
+			name:             "No increase in values",
+			current:          "100m",
+			new:              "100m",
+			thresholdPercent: 10.0,
+			expected:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			currentQuantity := resource.MustParse(tt.current)
+			newQuantity := resource.MustParse(tt.new)
+
+			result := exceedsThreshold(currentQuantity, newQuantity, tt.thresholdPercent)
+			if result != tt.expected {
+				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestRightSizeContainers(t *testing.T) {
+	tests := []struct {
+		name          string
+		qworker       *v1alpha1.QWorker
+		podList       []ctrlclient.Object
+		metricsData   map[string]*metricsv1beta1.PodMetrics
+		expectedError bool
+	}{
+		{
+			name: "No pods found",
+			qworker: &v1alpha1.QWorker{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-qworker",
+				},
+			},
+			podList:       []ctrlclient.Object{},
+			metricsData:   map[string]*metricsv1beta1.PodMetrics{},
+			expectedError: false,
+		},
+		{
+			name: "Pod metrics exceed threshold",
+			qworker: &v1alpha1.QWorker{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-qworker",
+				},
+				Status: v1alpha1.QWorkerStatus{
+					MaxContainerResourcesUsage: []corev1.ResourceList{
+						{
+							corev1.ResourceCPU:    resource.MustParse("500m"),
+							corev1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			},
+			podList: []ctrlclient.Object{
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-pod",
+						OwnerReferences: []metav1.OwnerReference{
+							{Name: "test-qworker"},
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "test-container"}},
+					},
+				},
+			},
+			metricsData: map[string]*metricsv1beta1.PodMetrics{
+				"test-namespace_test-pod": {
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "test-namespace",
+						Name:      "test-pod",
+					},
+					Containers: []metricsv1beta1.ContainerMetrics{
+						{
+							Name: "test-container",
+							Usage: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("600m"),
+								corev1.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.TODO()
+			scheme := runtime.NewScheme()
+			_ = corev1.AddToScheme(scheme)
+			_ = metricsv1beta1.AddToScheme(scheme)
+
+			// Create fake client for pods
+			clientBuilder := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tt.podList...)
+			clientBuilder.WithIndex(&corev1.Pod{}, "metadata.ownerReferences.name", func(obj ctrlclient.Object) []string {
+				pod, ok := obj.(*corev1.Pod)
+				if !ok {
+					return []string{}
+				}
+				var results []string
+				for _, ownerRef := range pod.OwnerReferences {
+					results = append(results, ownerRef.Name)
+				}
+				return results
+			})
+			client := clientBuilder.Build()
+
+			// Create fake metrics client with reactors
+			metricsFakeClient := fake2.NewSimpleClientset()
+			metricsClient := metricsFakeClient.MetricsV1beta1()
+			metricsFakeClient.PrependReactor("get", "podmetrics", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				getAction := action.(k8stesting.GetAction)
+				if key, exists := tt.metricsData[getAction.GetNamespace()+"_"+getAction.GetName()]; exists {
+					return true, key, nil
+				}
+				return true, nil, fmt.Errorf("Pod metrics not found for %s/%s", getAction.GetNamespace(), getAction.GetName())
+			})
+
+			s := MetricsServer{
+				client:        client,
+				metricsClient: metricsClient,
+			}
+
+			err := s.RightSizeContainers(ctx, tt.qworker)
+			if (err != nil) != tt.expectedError {
+				t.Errorf("expected error: %v, got: %v", tt.expectedError, err)
+			}
+		})
 	}
 }
