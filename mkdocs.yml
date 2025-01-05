@@ -30,7 +30,7 @@ markdown_extensions:
 nav:
   - Introduction: index.md
   - Getting Started:
-    - Installation: getting_started/index.md
+    - Installation: getting_started/installation.md
     - Setup Broker: getting_started/setup.md
   - Concepts:
       - Qworker: concepts/qworker.md
