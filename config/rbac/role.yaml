@@ -7,17 +7,18 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
+  - events
+  - secrets
   verbs:
-  - create
   - get
   - list
   - watch
 - apiGroups:
   - ""
   resources:
-  - secrets
+  - pods
   verbs:
+  - create
   - get
   - list
   - watch
