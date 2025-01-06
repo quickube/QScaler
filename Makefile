@@ -68,7 +68,7 @@ deploy: init-kind init-metrics-server init-redis local-build local-push manifest
 
 .PHONY: init-metrics-server
 init-metrics-server:
-	sh ./hack/init-metrics-srever.sh
+	sh ./hack/init-metrics-server.sh
 
 
 .PHONY: clean

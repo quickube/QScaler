@@ -37,7 +37,7 @@ func StartServer(ctx context.Context, mgr manager.Manager) {
 	_ = log.FromContext(ctx)
 
 	server := getMetricsServer(mgr)
-
+	go server.startOOMKillEventInformer(ctx)
 	go run(ctx, *server)
 
 }

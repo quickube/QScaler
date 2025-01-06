@@ -9,6 +9,7 @@ import (
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	"github.com/quickube/QScaler/internal/mocks"
+	"github.com/stretchr/testify/assert"
 	assertion "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
@@ -371,4 +372,79 @@ func TestRightSizeContainers(t *testing.T) {
 
 		})
 	}
+}
+
+func TestRightSizeContainers_WithOOMKilledEvent(t *testing.T) {
+	// Setup scheme
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)         // Add corev1 (Pods, Events)
+	_ = metricsv1beta1.AddToScheme(scheme) // Add metrics API
+	_ = v1alpha1.AddToScheme(scheme)       // Add QScaler custom resources
+
+	// Mock data
+	ctx := context.TODO()
+	qworker := &v1alpha1.QWorker{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-qworker",
+			Namespace: "default",
+		},
+		Spec: v1alpha1.QWorkerSpec{
+			ScaleConfig: v1alpha1.QWorkerScaleConfig{
+				ActivateVPA: true,
+			},
+		},
+		Status: v1alpha1.QWorkerStatus{
+			MaxContainerResourcesUsage: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("500m"),
+					corev1.ResourceMemory: resource.MustParse("128Mi"),
+				},
+			},
+		},
+	}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Name: qworker.Name,
+				},
+			},
+		},
+	}
+	oomEvent := &corev1.Event{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "oom-event",
+			Namespace: "default",
+		},
+		InvolvedObject: corev1.ObjectReference{
+			Name: pod.Name,
+		},
+		Reason:  "OOMKilled",
+		Message: "Pod was OOMKilled",
+	}
+
+	// Fake client with mock objects
+	client := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(qworker, pod, oomEvent).
+		Build()
+
+	// Metrics server with mock client
+	metricsServer := MetricsServer{
+		client: client,
+		Scheme: scheme,
+		qworkers: &v1alpha1.QWorkerList{
+			Items: []v1alpha1.QWorker{*qworker},
+		},
+	}
+
+	metricsServer.startOOMKillEventInformer(ctx)
+
+	// Validate memory was increased by 10%
+	time.Sleep(10 * time.Second)
+	expectedMemory := resource.MustParse("140.8Mi") // 128Mi + 10%
+	actualMemory := qworker.Status.MaxContainerResourcesUsage[0][corev1.ResourceMemory]
+	assert.Equal(t, expectedMemory.String(), actualMemory.String(), "Memory should increase by 10%")
 }

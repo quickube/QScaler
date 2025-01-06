@@ -3,17 +3,22 @@ package metrics
 import (
 	"context"
 	"fmt"
-
 	"github.com/quickube/QScaler/api/v1alpha1"
 	"github.com/quickube/QScaler/internal/brokers"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsv1beta1client "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"strings"
+	"time"
 )
 
 var (
@@ -161,4 +166,103 @@ func (s *MetricsServer) Sync(ctx context.Context) error {
 	s.qworkers = qworkerList
 	log.Log.Info("successfully synchronized QWorkers", "count", len(qworkerList.Items))
 	return nil
+}
+
+func (s *MetricsServer) startOOMKillEventInformer(ctx context.Context) {
+	log.Log.Info("Starting OOMKill Event Informer")
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Log.Error(err, "Failed to load in-cluster config")
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Log.Error(err, "Failed to create Kubernetes clientset")
+	}
+
+	// Create a shared informer factory
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 30*time.Second)
+	eventInformer := informerFactory.Core().V1().Events().Informer()
+
+	// Add event handler
+	_, err = eventInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			event := obj.(*corev1.Event)
+			if event.Reason == "Killing" && strings.Contains(event.Message, "due to OOM") {
+				log.Log.Info(fmt.Sprintf("OOMKill event detected: %s/%s - %s", event.Namespace, event.InvolvedObject.Name, event.Message))
+				s.handleOOMKillEvent(ctx, event)
+			}
+		},
+	})
+	if err != nil {
+		fmt.Println(fmt.Sprintf(err.Error()))
+	}
+
+	// Start the informer
+	stopCh := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		close(stopCh)
+	}()
+	defer close(stopCh)
+
+	informerFactory.Start(stopCh)
+	informerFactory.WaitForCacheSync(stopCh)
+	log.Log.Info("OOMKill Event Informer started")
+}
+
+func (s *MetricsServer) handleOOMKillEvent(ctx context.Context, event *corev1.Event) {
+	log.Log.Info(fmt.Sprintf("Handling OOMKill event for Pod: %s in Namespace: %s", event.InvolvedObject.Name, event.Namespace))
+
+	// Retrieve the affected pod
+	var pod corev1.Pod
+	err := s.client.Get(ctx, client.ObjectKey{
+		Namespace: event.Namespace,
+		Name:      event.InvolvedObject.Name,
+	}, &pod)
+	if err != nil {
+		log.Log.Error(err, "Failed to get Pod", "PodName", event.InvolvedObject.Name, "Namespace", event.Namespace)
+		return
+	}
+
+	// Check if the pod belongs to a QWorker
+	for _, ownerRef := range pod.OwnerReferences {
+		if ownerRef.Kind == "QWorker" {
+			// Fetch the QWorker
+			var qworker v1alpha1.QWorker
+			err = s.client.Get(ctx, client.ObjectKey{
+				Namespace: pod.Namespace,
+				Name:      ownerRef.Name,
+			}, &qworker)
+			if err != nil {
+				log.Log.Error(err, "Failed to get QWorker", "QWorkerName", ownerRef.Name, "Namespace", pod.Namespace)
+				return
+			}
+
+			// Increase the MaxMemory by 10%
+			err = s.increaseMaxMemory(ctx, &qworker)
+			if err != nil {
+				log.Log.Error(err, "Failed to increase MaxMemory for QWorker", "QWorkerName", qworker.Name)
+			}
+			return
+		}
+	}
+}
+
+func (s *MetricsServer) increaseMaxMemory(ctx context.Context, qworker *v1alpha1.QWorker) error {
+	// Iterate over the container resource usages and increase memory by 10%
+	for i := range qworker.Status.MaxContainerResourcesUsage {
+		currentMemory := qworker.Status.MaxContainerResourcesUsage[i][corev1.ResourceMemory]
+		tenPercent := currentMemory.Value() / 10
+		newMemory := currentMemory.DeepCopy()
+		newMemory.Add(*resource.NewQuantity(tenPercent, resource.BinarySI))
+
+		qworker.Status.MaxContainerResourcesUsage[i][corev1.ResourceMemory] = newMemory
+
+		log.Log.Info(fmt.Sprintf("Increased max memory for QWorker %s by 10%% to %s",
+			qworker.Name, newMemory.String()))
+	}
+
+	// Update the QWorker's status
+	return s.client.Status().Update(ctx, qworker)
 }
