@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - "chart-release-flow"
+  pull_request:
+    branches:
+      - "main"
 #  release:
 #    types:
 #      - published
