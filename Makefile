@@ -116,8 +116,8 @@ $(ENVTEST): $(LOCALBIN)
 
 .PHONY: helm
 helm: manifests
-	helm lint ./helm
-	helm template ./helm --debug > _lint.yaml
+	helm lint ./helm-chart
+	helm template ./helm-chart --debug > _lint.yaml
 
 mocks:
 	mockery --all --output ./internal/mocks
