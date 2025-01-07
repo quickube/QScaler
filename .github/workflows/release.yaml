@@ -30,7 +30,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: quickube/qscaler:${{ github.ref_name }},latest
+          tags: quickube/qscaler:${{ github.ref_name }},quickube/qscaler:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -50,4 +50,4 @@ jobs:
           chart_version: ${{ github.ref_name }}
           app_version: ${{ github.ref_name }}
           token: ${{ secrets.GIT_TOKEN }}
-          charts_dir: helm
+          charts_dir: .
