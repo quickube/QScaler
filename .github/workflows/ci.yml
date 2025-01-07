@@ -44,3 +44,23 @@ jobs:
           version: v1.60
           only-new-issues: true
           args: --timeout=10m
+  helm:
+    name: Helm Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Check Git diff in /helm
+        run: |
+          if [ "$(git diff --exit-code --name-only --diff-filter=d origin/main -- helm/)" != "" ]; then
+            echo "There are Git diffs in the /helm-chart folder."
+            echo "CHART_UPDATED=true" >> $GITHUB_ENV
+          else
+            echo "There are no Git diffs in the /helm-chart folder."
+          fi
+      - name: Helm lint and template
+        run: |
+          make helm
+        if: ${{ env.CHART_UPDATED }}
