@@ -7,7 +7,7 @@ on:
       - edited
 
 jobs:
-  piper-image:
+  qscaler-image:
     name: qscaler-image
     runs-on: ubuntu-latest
     steps:
@@ -50,4 +50,4 @@ jobs:
           chart_version: ${{ github.ref_name }}
           app_version: ${{ github.ref_name }}
           token: ${{ secrets.GIT_TOKEN }}
-          charts_dir: helm
+          charts_dir: .
