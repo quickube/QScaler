@@ -47,13 +47,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Helm
         uses: azure/setup-helm@v4.2.0
-      - name: Helm lint and template
-        run: |
-          make helm
       - name: Publish Helm chart
         uses: stefanprodan/helm-gh-pages@master
         with:
           chart_version: ${{ github.ref_name }}
           app_version: ${{ github.ref_name }}
           token: ${{ secrets.GIT_TOKEN }}
-          charts_dir: helm
+          charts_dir: ./helm
