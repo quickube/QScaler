@@ -2,7 +2,7 @@ module github.com/quickube/QScaler
 
 go 1.23.0
 
-toolchain go1.23.4
+toolchain go1.24.1
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
@@ -12,7 +12,7 @@ require (
 	github.com/onsi/gomega v1.36.2
 	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.32.1
-	k8s.io/apimachinery v0.32.1
+	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.1
 	k8s.io/metrics v0.32.1
 	sigs.k8s.io/controller-runtime v0.19.4
